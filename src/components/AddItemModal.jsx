@@ -1,16 +1,21 @@
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
 import TitleInput from './TitleInput.jsx'
+import NotionEditor from './NotionEditor.jsx'
 
 // 노션 페이지처럼 큰 제목 입력칸과 투명한 본문 입력칸을 가진 빠른 추가 모달.
 // 닫기 버튼, 배경 클릭, ESC 키로 닫을 수 있다.
 export default function AddItemModal({ onClose }) {
   useEffect(() => {
+    // 에디터가 ESC를 먼저 처리하므로 캡처 단계에서 슬래시 메뉴가 열려 있는지 확인한다.
+    // 메뉴가 열려 있으면 메뉴만 닫히고, 아니면 모달을 닫는다.
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key !== 'Escape') return
+      if (document.querySelector('.bn-suggestion-menu')) return
+      onClose()
     }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    window.addEventListener('keydown', handleKeyDown, true)
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
   }, [onClose])
 
   return (
@@ -42,12 +47,9 @@ export default function AddItemModal({ onClose }) {
           </button>
         </header>
         <TitleInput size="modal" />
-        <textarea
-          aria-label="내용"
-          rows={8}
-          placeholder="명령어를 사용하려면 '/'를 입력하세요..."
-          className="w-full resize-none bg-transparent text-base text-gray-100 outline-none placeholder:text-gray-500"
-        />
+        <section aria-label="내용" className="min-h-48">
+          <NotionEditor />
+        </section>
       </section>
     </div>
   )

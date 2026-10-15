@@ -1,5 +1,6 @@
 import TitleInput from './TitleInput.jsx'
 import NotionTable from './NotionTable.jsx'
+import NotionEditor from './NotionEditor.jsx'
 
 // 제목, 본문 안내, 표 블록으로 이루어진 노션 스타일 페이지 뼈대
 export default function NotionPage({ name, columns }) {
@@ -9,7 +10,7 @@ export default function NotionPage({ name, columns }) {
         <TitleInput size="page" />
       </header>
       <section aria-label="본문">
-        <p className="text-gray-500">명령어를 사용하려면 '/'를 입력하세요...</p>
+        <NotionEditor />
       </section>
       <NotionTable name={name} columns={columns} />
     </article>

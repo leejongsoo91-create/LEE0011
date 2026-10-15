@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
+import { toast } from 'sonner'
 import TitleInput from './TitleInput.jsx'
 import NotionEditor from './NotionEditor.jsx'
 
@@ -17,6 +18,12 @@ export default function AddItemModal({ onClose }) {
     window.addEventListener('keydown', handleKeyDown, true)
     return () => window.removeEventListener('keydown', handleKeyDown, true)
   }, [onClose])
+
+  // 저장/닫기 버튼: 토스트를 띄우고 모달을 닫는다.
+  const handleDone = () => {
+    toast('항목이 추가되었습니다')
+    onClose()
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -50,6 +57,22 @@ export default function AddItemModal({ onClose }) {
         <section aria-label="내용" className="min-h-48">
           <NotionEditor />
         </section>
+        <footer className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={handleDone}
+            className="rounded-lg px-4 py-2 text-sm text-gray-400 transition-colors hover:bg-gray-700 hover:text-white"
+          >
+            닫기
+          </button>
+          <button
+            type="button"
+            onClick={handleDone}
+            className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-white"
+          >
+            저장
+          </button>
+        </footer>
       </section>
     </div>
   )

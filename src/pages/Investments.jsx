@@ -1,7 +1,5 @@
-import WidgetBox from '../components/WidgetBox.jsx'
+import NotionPage from '../components/NotionPage.jsx'
 
 export default function Investments() {
-  return (
-    <WidgetBox title="Investments">여기에 Investments 상세 데이터 영역</WidgetBox>
-  )
+  return <NotionPage name="Investments" columns={['종목명', '티커', '수량']} />
 }

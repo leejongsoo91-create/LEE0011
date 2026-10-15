@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
+import TitleInput from './TitleInput.jsx'
 
-// 새 항목 추가 모달. 닫기 버튼, 배경 클릭, ESC 키로 닫을 수 있다.
+// 노션 페이지처럼 큰 제목 입력칸과 투명한 본문 입력칸을 가진 빠른 추가 모달.
+// 닫기 버튼, 배경 클릭, ESC 키로 닫을 수 있다.
 export default function AddItemModal({ onClose }) {
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -24,10 +26,10 @@ export default function AddItemModal({ onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-item-title"
-        className="relative w-full max-w-md rounded-2xl bg-gray-800 p-6"
+        className="relative flex max-h-[85vh] w-full max-w-2xl flex-col gap-4 overflow-y-auto rounded-2xl bg-gray-800 p-6"
       >
-        <div className="flex items-center justify-between">
-          <h2 id="add-item-title" className="text-lg font-semibold text-white">
+        <header className="flex items-center justify-between">
+          <h2 id="add-item-title" className="text-sm font-medium text-gray-400">
             새 항목 추가
           </h2>
           <button
@@ -38,8 +40,14 @@ export default function AddItemModal({ onClose }) {
           >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
-        </div>
-        <p className="mt-6 text-sm text-gray-400">새 항목 추가 폼 영역</p>
+        </header>
+        <TitleInput size="modal" />
+        <textarea
+          aria-label="내용"
+          rows={8}
+          placeholder="명령어를 사용하려면 '/'를 입력하세요..."
+          className="w-full resize-none bg-transparent text-base text-gray-100 outline-none placeholder:text-gray-500"
+        />
       </section>
     </div>
   )

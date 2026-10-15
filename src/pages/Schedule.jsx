@@ -1,7 +1,5 @@
-import WidgetBox from '../components/WidgetBox.jsx'
+import NotionPage from '../components/NotionPage.jsx'
 
 export default function Schedule() {
-  return (
-    <WidgetBox title="Schedule">여기에 Schedule 상세 데이터 영역</WidgetBox>
-  )
+  return <NotionPage name="Schedule" columns={['이름', '날짜', '태그']} />
 }

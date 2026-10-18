@@ -7,18 +7,20 @@ import Header from './Header.jsx'
 import Fab from './Fab.jsx'
 import AddItemModal from './AddItemModal.jsx'
 import CommandPalette from './CommandPalette.jsx'
+import useTheme from '../hooks/useTheme.js'
 
 export default function Layout() {
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const theme = useTheme()
 
   return (
     <>
-      <Toaster theme="dark" position="bottom-center" offset={90} mobileOffset={90} />
+      <Toaster theme={theme} position="bottom-center" offset={90} mobileOffset={90} />
       <CommandPalette />
       <Sidebar />
-      <div className="min-h-screen lg:ml-[250px]">
+      <div className="min-h-screen lg:ml-[var(--sidebar-w,250px)]">
         <Header />
-        <main className="p-4 pb-40 lg:p-8 lg:pb-24">
+        <main className="@container p-4 pb-40 lg:p-8 lg:pb-24">
           <Outlet />
         </main>
       </div>

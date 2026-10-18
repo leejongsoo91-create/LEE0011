@@ -1,10 +1,23 @@
+import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { navItems } from './navItems.js'
+import SidebarResizer, { clampWidth } from './SidebarResizer.jsx'
+import { readStorage, writeStorage } from '../utils/storage.js'
 
-// 데스크톱(lg 이상)에서만 보이는 좌측 고정 사이드바
+const widthKey = 'sidebar-width'
+
+// 데스크톱(lg 이상)에서만 보이는 좌측 고정 사이드바 (너비 조절 가능)
 export default function Sidebar() {
+  const [width, setWidth] = useState(() => clampWidth(Number(readStorage(widthKey)) || 250))
+
+  // 너비를 CSS 변수로 공유해서 본문 왼쪽 여백(Layout)도 함께 움직이게 한다.
+  useEffect(() => {
+    document.documentElement.style.setProperty('--sidebar-w', `${width}px`)
+    writeStorage(widthKey, String(width))
+  }, [width])
+
   return (
-    <aside className="fixed inset-y-0 left-0 hidden w-[250px] flex-col border-r border-gray-700 bg-gray-800 lg:flex">
+    <aside className="fixed inset-y-0 left-0 hidden w-[var(--sidebar-w,250px)] flex-col border-r border-gray-700 bg-gray-800 lg:flex">
       <p className="px-6 py-6 text-lg font-bold tracking-tight text-white">
         My Dashboard
       </p>
@@ -27,6 +40,7 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
+      <SidebarResizer width={width} onChange={setWidth} />
     </aside>
   )
 }

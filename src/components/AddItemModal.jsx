@@ -1,8 +1,11 @@
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
 import { toast } from 'sonner'
+import { removeStorage } from '../utils/storage.js'
 import TitleInput from './TitleInput.jsx'
 import NotionEditor from './NotionEditor.jsx'
+
+const draftKey = 'editor:modal'
 
 // 노션 페이지처럼 큰 제목 입력칸과 투명한 본문 입력칸을 가진 빠른 추가 모달.
 // 닫기 버튼, 배경 클릭, ESC 키로 닫을 수 있다.
@@ -23,6 +26,12 @@ export default function AddItemModal({ onClose }) {
   const handleDone = () => {
     toast('항목이 추가되었습니다')
     onClose()
+  }
+
+  // 저장하면 임시 저장해 둔 초안을 비운다.
+  const handleSave = () => {
+    removeStorage(draftKey)
+    handleDone()
   }
 
   return (
@@ -55,7 +64,7 @@ export default function AddItemModal({ onClose }) {
         </header>
         <TitleInput size="modal" />
         <section aria-label="내용" className="min-h-48">
-          <NotionEditor />
+          <NotionEditor storageKey={draftKey} />
         </section>
         <footer className="flex justify-end gap-2">
           <button
@@ -67,7 +76,7 @@ export default function AddItemModal({ onClose }) {
           </button>
           <button
             type="button"
-            onClick={handleDone}
+            onClick={handleSave}
             className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-white"
           >
             저장

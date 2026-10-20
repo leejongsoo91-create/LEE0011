@@ -1,4 +1,9 @@
+import Skeleton from './Skeleton.jsx'
+import EmptyState from './EmptyState.jsx'
+import useRows from '../hooks/useRows.js'
+
 const weekdays = ['월', '화', '수', '목', '금', '토', '일']
+const pad = (value) => String(value).padStart(2, '0')
 
 // 이번 달 1일 앞의 빈 칸(월요일 시작 기준)과 날짜 목록을 만든다.
 function buildCells(year, month) {
@@ -9,18 +14,25 @@ function buildCells(year, month) {
   return [...blanks, ...dates]
 }
 
-// 월간 달력 그리드 뼈대 (요일 헤더 + 날짜 카드)
+// 월간 달력 그리드. schedule 테이블의 일정이 해당 날짜 칸에 표시된다.
 export default function CalendarGrid() {
+  const { rows, isLoading } = useRows('schedule')
   const today = new Date()
   const year = today.getFullYear()
   const month = today.getMonth()
   const cells = buildCells(year, month)
 
+  const titlesOf = (date) =>
+    rows.filter((row) => row.date === `${year}-${pad(month + 1)}-${pad(date)}`).map((row) => row.title || '제목 없음')
+
   return (
     <section aria-label="월간 달력" className="mx-auto max-w-4xl pb-8">
-      <h2 className="mb-4 text-xl font-bold text-gray-100">
-        {year}년 {month + 1}월
-      </h2>
+      <div className="mb-4 flex items-center gap-3">
+        <h2 className="text-xl font-bold text-gray-100">
+          {year}년 {month + 1}월
+        </h2>
+        {isLoading && <Skeleton className="h-4 w-24" />}
+      </div>
       <div className="grid grid-cols-7 gap-1 lg:gap-2">
         {weekdays.map((day) => (
           <div key={day} className="py-2 text-center text-xs font-medium text-gray-500">
@@ -33,15 +45,25 @@ export default function CalendarGrid() {
           ) : (
             <div
               key={date}
-              className={`min-h-16 rounded-lg border bg-gray-800 p-1.5 text-xs text-gray-300 lg:min-h-24 lg:p-2 lg:text-sm ${
+              className={`flex min-h-16 min-w-0 flex-col gap-1 rounded-lg border bg-gray-800 p-1.5 text-xs text-gray-300 lg:min-h-24 lg:p-2 lg:text-sm ${
                 date === today.getDate() ? 'border-gray-400 text-white' : 'border-gray-700'
               }`}
             >
               {date}
+              {titlesOf(date).slice(0, 2).map((title, i) => (
+                <span key={i} className="truncate rounded bg-indigo-500/20 px-1 text-[10px] text-indigo-300 lg:text-xs">
+                  {title}
+                </span>
+              ))}
             </div>
           ),
         )}
       </div>
+      {!isLoading && rows.length === 0 && (
+        <div className="mt-4">
+          <EmptyState message="등록된 일정이 없어요" hint="오른쪽 아래 + 버튼을 눌러 Schedule 페이지에서 일정을 추가해 보세요." />
+        </div>
+      )}
     </section>
   )
 }

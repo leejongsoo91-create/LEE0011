@@ -14,22 +14,3 @@ export function writeStorage(key, value) {
     // 저장할 수 없는 환경이면 조용히 건너뛴다.
   }
 }
-
-export function removeStorage(key) {
-  try {
-    window.localStorage.removeItem(key)
-  } catch {
-    // 지울 수 없는 환경이면 조용히 건너뛴다.
-  }
-}
-
-// 저장된 JSON을 읽는다. 없거나 깨졌으면 fallback을 돌려준다.
-export function readJson(key, fallback) {
-  const raw = readStorage(key)
-  if (!raw) return fallback
-  try {
-    return JSON.parse(raw)
-  } catch {
-    return fallback
-  }
-}

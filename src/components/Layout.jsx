@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import Sidebar from './Sidebar.jsx'
@@ -11,7 +11,23 @@ import useTheme from '../hooks/useTheme.js'
 
 export default function Layout() {
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editing, setEditing] = useState(null)
   const theme = useTheme()
+
+  // 카드 등을 누르면(edititem 이벤트) 해당 항목을 편집 모달로 연다.
+  useEffect(() => {
+    const handleEdit = (event) => {
+      setEditing(event.detail)
+      setIsModalOpen(true)
+    }
+    window.addEventListener('edititem', handleEdit)
+    return () => window.removeEventListener('edititem', handleEdit)
+  }, [])
+
+  const closeModal = () => {
+    setIsModalOpen(false)
+    setEditing(null)
+  }
 
   return (
     <>
@@ -26,7 +42,7 @@ export default function Layout() {
       </div>
       <BottomTab />
       <Fab onClick={() => setIsModalOpen(true)} />
-      {isModalOpen && <AddItemModal onClose={() => setIsModalOpen(false)} />}
+      {isModalOpen && <AddItemModal key={editing?.row.id ?? 'new'} editing={editing} onClose={closeModal} />}
     </>
   )
 }

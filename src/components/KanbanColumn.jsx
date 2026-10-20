@@ -1,4 +1,5 @@
 import { Draggable, Droppable } from '@hello-pangea/dnd'
+import { openItemEditor } from '../utils/itemEditor.js'
 
 // 칸반의 한 열: 제목과 드래그 가능한 카드 목록
 export default function KanbanColumn({ column }) {
@@ -23,11 +24,12 @@ export default function KanbanColumn({ column }) {
                     ref={dragProvided.innerRef}
                     {...dragProvided.draggableProps}
                     {...dragProvided.dragHandleProps}
+                    onClick={() => openItemEditor('work', card)}
                     className={`rounded-lg border border-gray-700 bg-gray-900 p-3 text-sm text-gray-200 ${
                       dragSnapshot.isDragging ? 'border-gray-500 shadow-lg' : ''
                     }`}
                   >
-                    {card.text}
+                    {card.title || '제목 없음'}
                   </li>
                 )}
               </Draggable>

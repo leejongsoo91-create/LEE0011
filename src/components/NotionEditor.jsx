@@ -9,7 +9,6 @@ import { editorSchema } from './editorSchema.jsx'
 import EditorToolbar from './EditorToolbar.jsx'
 import EditorSlashMenu from './EditorSlashMenu.jsx'
 import useTheme from '../hooks/useTheme.js'
-import { readJson, writeStorage } from '../utils/storage.js'
 import { extractHeadings } from '../utils/headings.js'
 
 const hint = "명령어를 사용하려면 '/'를 입력하세요..."
@@ -28,16 +27,15 @@ const wrapperClass = [
   '[&_h3]:text-lg! [&_h3]:font-semibold! [&_h3]:text-violet-600! dark:[&_h3]:text-violet-300!',
 ].join(' ')
 
-// 서식 툴바, 코드/토글 블록, 자동저장(localStorage)을 갖춘 노션 스타일 블록 에디터.
-// storageKey가 있으면 입력 내용이 브라우저에만 임시 저장되어 새로고침해도 유지된다.
-export default function NotionEditor({ storageKey, onHeadingsChange }) {
+// 서식 툴바, 코드/토글 블록을 갖춘 노션 스타일 블록 에디터.
+// initialContent로 저장된 블록(JSON)을 불러오고, 내용이 바뀌면 onDocumentChange로 알려 준다.
+export default function NotionEditor({ initialContent, onDocumentChange, onHeadingsChange }) {
   const theme = useTheme()
-  const saved = storageKey ? readJson(storageKey, null) : null
   const editor = useCreateBlockNote({
     schema: editorSchema,
     dictionary,
     extensions: [syntaxHighlighter],
-    initialContent: Array.isArray(saved) && saved.length > 0 ? saved : undefined,
+    initialContent: Array.isArray(initialContent) && initialContent.length > 0 ? initialContent : undefined,
   })
 
   useEffect(() => {
@@ -45,7 +43,7 @@ export default function NotionEditor({ storageKey, onHeadingsChange }) {
   }, [editor, onHeadingsChange])
 
   const handleChange = () => {
-    if (storageKey) writeStorage(storageKey, JSON.stringify(editor.document))
+    onDocumentChange?.(editor.document)
     onHeadingsChange?.(extractHeadings(editor.document))
   }
 

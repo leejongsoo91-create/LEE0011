@@ -1,12 +1,13 @@
 import { Draggable, Droppable } from '@hello-pangea/dnd'
 import WidgetBox from './WidgetBox.jsx'
-import InvestmentChart from './InvestmentChart.jsx'
+import { HobbiesSummary, InvestmentsSummary, ScheduleSummary, WorkSummary } from './HomeSummaries.jsx'
 
+// 위젯 제목 → 내용 (Supabase에서 불러온 요약)
 const widgetContents = {
-  Schedule: '여기에 Schedule 데이터 영역',
-  Work: '여기에 Work 데이터 영역',
-  Hobbies: '여기에 Hobbies 데이터 영역',
-  Investments: <InvestmentChart />,
+  Schedule: <ScheduleSummary />,
+  Work: <WorkSummary />,
+  Hobbies: <HobbiesSummary />,
+  Investments: <InvestmentsSummary />,
 }
 
 // 드래그 가능한 위젯들이 세로로 쌓이는 한 개의 열

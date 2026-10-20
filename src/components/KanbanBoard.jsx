@@ -1,46 +1,62 @@
-import { useState } from 'react'
 import { DragDropContext } from '@hello-pangea/dnd'
+import { toast } from 'sonner'
 import KanbanColumn from './KanbanColumn.jsx'
+import Skeleton from './Skeleton.jsx'
+import EmptyState from './EmptyState.jsx'
+import useRows from '../hooks/useRows.js'
+import { updateRow } from '../lib/db.js'
 
-const initialColumns = [
-  { id: 'todo', title: '할 일', cards: [
-    { id: 'card-1', text: '주간 업무 정리' },
-    { id: 'card-2', text: '기획서 초안 작성' },
-    { id: 'card-3', text: '디자인 시안 확인' },
-  ] },
-  { id: 'doing', title: '진행 중', cards: [
-    { id: 'card-4', text: '대시보드 화면 구현' },
-    { id: 'card-5', text: '고객 미팅 자료 준비' },
-  ] },
-  { id: 'done', title: '완료', cards: [
-    { id: 'card-6', text: '프로젝트 환경 세팅' },
-  ] },
+// 열 id는 DB의 status 값과 같다.
+const statusColumns = [
+  { id: 'Todo', title: '할 일' },
+  { id: 'In Progress', title: '진행 중' },
+  { id: 'Done', title: '완료' },
 ]
 
-// 카드를 드래그해 열 사이를 옮길 수 있는 칸반 보드 뼈대 (새로고침하면 초기화됨)
+// Supabase의 work 테이블을 읽어 상태별로 보여주는 칸반 보드.
+// 카드를 다른 열로 끌면 status가 DB에 저장된다.
 export default function KanbanBoard() {
-  const [columns, setColumns] = useState(initialColumns)
+  const { rows, setRows, isLoading, reload } = useRows('work')
 
-  const handleDragEnd = ({ source, destination }) => {
-    if (!destination) return
-    const next = columns.map((column) => ({ ...column, cards: [...column.cards] }))
-    const from = next.find((column) => column.id === source.droppableId)
-    const to = next.find((column) => column.id === destination.droppableId)
-    const [moved] = from.cards.splice(source.index, 1)
-    to.cards.splice(destination.index, 0, moved)
-    setColumns(next)
+  const handleDragEnd = async ({ source, destination, draggableId }) => {
+    if (!destination || destination.droppableId === source.droppableId) return
+    const status = destination.droppableId
+    setRows((prev) => prev.map((row) => (row.id === draggableId ? { ...row, status } : row)))
+    try {
+      await updateRow('work', draggableId, { status })
+    } catch {
+      toast.error('변경 사항을 저장하지 못했습니다')
+      reload()
+    }
   }
 
   return (
     <section aria-label="칸반 보드" className="mx-auto max-w-4xl pb-8">
       <h2 className="mb-4 text-xl font-bold text-gray-100">칸반 보드</h2>
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          {columns.map((column) => (
-            <KanbanColumn key={column.id} column={column} />
+      {isLoading ? (
+        <div role="status" aria-label="불러오는 중" className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {statusColumns.map((column) => (
+            <div key={column.id} className="flex flex-col gap-2 rounded-xl bg-gray-800 p-3">
+              <Skeleton className="mb-1 h-4 w-16" />
+              <Skeleton className="h-11 w-full" />
+              <Skeleton className="h-11 w-full" />
+            </div>
           ))}
         </div>
-      </DragDropContext>
+      ) : rows.length === 0 ? (
+        <EmptyState message="아직 등록된 업무가 없어요" hint="오른쪽 아래 + 버튼을 눌러 Work 페이지에서 첫 업무를 추가해 보세요." />
+      ) : (
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            {statusColumns.map((column) => (
+              <KanbanColumn
+                key={column.id}
+                column={{ ...column, cards: rows.filter((row) => row.status === column.id) }}
+              />
+            ))}
+          </div>
+        </DragDropContext>
+      )}
     </section>
   )
 }

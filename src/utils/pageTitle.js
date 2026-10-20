@@ -1,14 +1,12 @@
-import { readStorage, writeStorage } from './storage.js'
+// 페이지별 제목을 메모리에만 들고 있다. (새로고침하면 사라지고, 저장은 모달/Supabase가 맡는다.)
+const titles = new Map()
 
-const keyOf = (path) => `page-title:${path}`
-
-// 페이지별 제목을 읽는다. 없으면 빈 문자열.
 export function loadTitle(path) {
-  return readStorage(keyOf(path)) ?? ''
+  return titles.get(path) ?? ''
 }
 
-// 제목을 임시 저장하고, 빵부스러기가 갱신되도록 알린다.
+// 제목을 기억하고, 빵부스러기가 갱신되도록 알린다.
 export function saveTitle(path, title) {
-  writeStorage(keyOf(path), title)
+  titles.set(path, title)
   window.dispatchEvent(new Event('titlechange'))
 }

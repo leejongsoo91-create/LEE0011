@@ -14,14 +14,19 @@ export default function Layout() {
   const [editing, setEditing] = useState(null)
   const theme = useTheme()
 
-  // 카드 등을 누르면(edititem 이벤트) 해당 항목을 편집 모달로 연다.
+  // 카드를 누르면(edititem) 편집 모달, '+ 새로 만들기'를 누르면(additem) 추가 모달을 연다.
   useEffect(() => {
     const handleEdit = (event) => {
       setEditing(event.detail)
       setIsModalOpen(true)
     }
+    const handleAdd = () => setIsModalOpen(true)
     window.addEventListener('edititem', handleEdit)
-    return () => window.removeEventListener('edititem', handleEdit)
+    window.addEventListener('additem', handleAdd)
+    return () => {
+      window.removeEventListener('edititem', handleEdit)
+      window.removeEventListener('additem', handleAdd)
+    }
   }, [])
 
   const closeModal = () => {

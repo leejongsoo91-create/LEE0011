@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import TitleInput from './TitleInput.jsx'
 import NotionEditor from './NotionEditor.jsx'
+import InvestmentFields from './InvestmentFields.jsx'
 import useItemSave from '../hooks/useItemSave.js'
 
 // 노션 페이지처럼 큰 제목 입력칸과 블록 에디터를 가진 빠른 추가/편집 모달.
@@ -9,8 +10,9 @@ import useItemSave from '../hooks/useItemSave.js'
 export default function AddItemModal({ onClose, editing }) {
   const [title, setTitle] = useState(editing?.row.title ?? '')
   const [date, setDate] = useState(() => new Date().toLocaleDateString('sv-SE'))
+  const [investment, setInvestment] = useState({ ticker: '', avg_price: '', quantity: '' })
   const contentRef = useRef(null)
-  const { table, save } = useItemSave({ editing, onSaved: onClose })
+  const { table, save, isSaving } = useItemSave({ editing, onSaved: onClose })
 
   useEffect(() => {
     // 에디터가 ESC를 먼저 처리하므로 캡처 단계에서 슬래시 메뉴가 열려 있는지 확인한다.
@@ -61,6 +63,8 @@ export default function AddItemModal({ onClose, editing }) {
             onChange={(event) => setDate(event.target.value)}
             className="w-fit rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-200"
           />
+        ) : table === 'investments' ? (
+          <InvestmentFields values={investment} onChange={setInvestment} />
         ) : (
           <section aria-label="내용" className="min-h-48">
             <NotionEditor
@@ -73,16 +77,18 @@ export default function AddItemModal({ onClose, editing }) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm text-gray-400 transition-colors hover:bg-gray-700 hover:text-white"
+            disabled={isSaving}
+            className="rounded-lg px-4 py-2 text-sm text-gray-400 transition-colors hover:bg-gray-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             닫기
           </button>
           <button
             type="button"
-            onClick={() => save({ title, date, content: contentRef.current })}
-            className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-white"
+            onClick={() => save({ title, date, investment, content: contentRef.current })}
+            disabled={isSaving}
+            className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            저장
+            {isSaving ? '저장 중...' : '저장'}
           </button>
         </footer>
       </section>

@@ -1,5 +1,6 @@
 import DataState from './DataState.jsx'
 import InvestmentChart from './InvestmentChart.jsx'
+import ProgressBar from './ProgressBar.jsx'
 import useRows from '../hooks/useRows.js'
 
 const statusLabels = { Todo: '할 일', 'In Progress': '진행 중', Done: '완료' }
@@ -31,9 +32,14 @@ export function ScheduleSummary() {
 
 export function WorkSummary() {
   const { rows, isLoading } = useRows('work')
+  const average = rows.length ? Math.round(rows.reduce((sum, row) => sum + (row.progress || 0), 0) / rows.length) : 0
   const items = rows.slice(0, 3).map((row) => ({ id: row.id, label: `${row.title || '제목 없음'} · ${statusLabels[row.status] ?? row.status}` }))
   return (
     <DataState isLoading={isLoading} isEmpty={rows.length === 0} message="아직 등록된 항목이 없습니다" skeletonRows={2}>
+      <div className="mb-3 flex flex-col gap-1.5">
+        <p className="text-xs text-gray-400">전체 진행률 {average}% · {rows.length}건</p>
+        <ProgressBar progress={average} />
+      </div>
       <TitleList items={items} />
     </DataState>
   )

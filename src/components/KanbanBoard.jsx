@@ -6,26 +6,28 @@ import EmptyState from './EmptyState.jsx'
 import useRows from '../hooks/useRows.js'
 import { updateRow } from '../lib/db.js'
 
-// 열 id는 DB의 status 값과 같다.
+// 열 id는 DB의 status 값과 같고, 열마다 진행률(progress)이 정해져 있다.
 const statusColumns = [
-  { id: 'Todo', title: '할 일' },
-  { id: 'In Progress', title: '진행 중' },
-  { id: 'Done', title: '완료' },
+  { id: 'Todo', title: '할 일', progress: 0 },
+  { id: 'In Progress', title: '진행 중', progress: 50 },
+  { id: 'Done', title: '완료', progress: 100 },
 ]
 
 // Supabase의 work 테이블을 읽어 상태별로 보여주는 칸반 보드.
-// 카드를 다른 열로 끌면 status가 DB에 저장된다.
+// 카드를 다른 열로 끌면 status와 progress(0/50/100)가 DB에 함께 저장된다.
 export default function KanbanBoard() {
   const { rows, setRows, isLoading, reload } = useRows('work')
 
   const handleDragEnd = async ({ source, destination, draggableId }) => {
     if (!destination || destination.droppableId === source.droppableId) return
-    const status = destination.droppableId
-    setRows((prev) => prev.map((row) => (row.id === draggableId ? { ...row, status } : row)))
+    const target = statusColumns.find((column) => column.id === destination.droppableId)
+    const values = { status: target.id, progress: target.progress }
+    setRows((prev) => prev.map((row) => (row.id === draggableId ? { ...row, ...values } : row)))
     try {
-      await updateRow('work', draggableId, { status })
+      await updateRow('work', draggableId, values)
+      toast(`'${target.title}'(으)로 이동했습니다`)
     } catch {
-      toast.error('변경 사항을 저장하지 못했습니다')
+      toast.error('변경 사항을 저장하지 못했습니다. 원래 상태로 되돌립니다')
       reload()
     }
   }

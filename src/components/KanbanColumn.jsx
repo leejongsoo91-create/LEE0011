@@ -1,4 +1,5 @@
 import { Draggable, Droppable } from '@hello-pangea/dnd'
+import ProgressBar from './ProgressBar.jsx'
 import { openItemEditor } from '../utils/itemEditor.js'
 
 // 칸반의 한 열: 제목과 드래그 가능한 카드 목록
@@ -29,7 +30,8 @@ export default function KanbanColumn({ column }) {
                       dragSnapshot.isDragging ? 'border-gray-500 shadow-lg' : ''
                     }`}
                   >
-                    {card.title || '제목 없음'}
+                    <p className="mb-2">{card.title || '제목 없음'}</p>
+                    <ProgressBar progress={card.progress} />
                   </li>
                 )}
               </Draggable>

@@ -23,7 +23,7 @@ export function ScheduleSummary() {
   const upcoming = rows.filter((row) => row.date >= today).sort((a, b) => a.date.localeCompare(b.date))
   const items = upcoming.slice(0, 3).map((row) => ({ id: row.id, label: `${row.date.slice(5)} · ${row.title || '제목 없음'}` }))
   return (
-    <DataState isLoading={isLoading} isEmpty={items.length === 0} message="예정된 일정이 없어요" skeletonRows={2}>
+    <DataState isLoading={isLoading} isEmpty={items.length === 0} message="아직 등록된 항목이 없습니다" skeletonRows={2}>
       <TitleList items={items} />
     </DataState>
   )
@@ -33,7 +33,7 @@ export function WorkSummary() {
   const { rows, isLoading } = useRows('work')
   const items = rows.slice(0, 3).map((row) => ({ id: row.id, label: `${row.title || '제목 없음'} · ${statusLabels[row.status] ?? row.status}` }))
   return (
-    <DataState isLoading={isLoading} isEmpty={rows.length === 0} message="등록된 업무가 없어요" skeletonRows={2}>
+    <DataState isLoading={isLoading} isEmpty={rows.length === 0} message="아직 등록된 항목이 없습니다" skeletonRows={2}>
       <TitleList items={items} />
     </DataState>
   )
@@ -43,7 +43,7 @@ export function HobbiesSummary() {
   const { rows, isLoading } = useRows('hobbies')
   const items = rows.slice(0, 3).map((row) => ({ id: row.id, label: row.title || '제목 없음' }))
   return (
-    <DataState isLoading={isLoading} isEmpty={rows.length === 0} message="등록된 취미가 없어요" skeletonRows={2}>
+    <DataState isLoading={isLoading} isEmpty={rows.length === 0} message="아직 등록된 항목이 없습니다" skeletonRows={2}>
       <TitleList items={items} />
     </DataState>
   )
@@ -52,7 +52,7 @@ export function HobbiesSummary() {
 export function InvestmentsSummary() {
   const { rows, isLoading } = useRows('investments')
   return (
-    <DataState isLoading={isLoading} isEmpty={rows.length === 0} message="보유 종목이 없어요" skeletonRows={2}>
+    <DataState isLoading={isLoading} isEmpty={rows.length === 0} message="아직 등록된 항목이 없습니다" skeletonRows={2}>
       <InvestmentChart rows={rows} />
     </DataState>
   )

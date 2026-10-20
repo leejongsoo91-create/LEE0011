@@ -61,7 +61,7 @@ export default function CalendarGrid() {
       </div>
       {!isLoading && rows.length === 0 && (
         <div className="mt-4">
-          <EmptyState message="등록된 일정이 없어요" hint="오른쪽 아래 + 버튼을 눌러 Schedule 페이지에서 일정을 추가해 보세요." />
+          <EmptyState message="아직 등록된 항목이 없습니다" hint="오른쪽 아래 + 버튼을 눌러 Schedule 페이지에서 일정을 추가해 보세요." />
         </div>
       )}
     </section>

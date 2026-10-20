@@ -13,7 +13,7 @@ export default function useRows(table) {
     let cancelled = false
     listRows(table)
       .then((data) => !cancelled && setRows(data))
-      .catch(() => !cancelled && toast.error('데이터를 불러오는 데 실패했습니다', { id: 'load-error' }))
+      .catch(() => !cancelled && toast.error('데이터를 불러오지 못했습니다', { id: 'load-error' }))
       .finally(() => !cancelled && setIsLoading(false))
     return () => {
       cancelled = true

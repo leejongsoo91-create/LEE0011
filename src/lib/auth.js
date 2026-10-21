@@ -13,7 +13,8 @@ export async function signIn(email, password) {
 
 // 회원가입한다. 이메일 인증이 켜져 있으면 session이 없고, 켜져 있지 않으면 바로 로그인된다.
 export async function signUp(email, password) {
-  const { data, error } = await getClient().auth.signUp({ email, password })
+  // 인증 메일의 링크가 지금 접속 중인 사이트 주소로 돌아오도록 알려 준다. (Supabase의 Redirect URLs에 허용된 주소여야 함)
+  const { data, error } = await getClient().auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } })
   if (error) throw error
   return { needsConfirmation: !data.session }
 }

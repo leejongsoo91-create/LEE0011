@@ -1,9 +1,10 @@
 import { Draggable, Droppable } from '@hello-pangea/dnd'
 import ProgressBar from './ProgressBar.jsx'
+import DeleteButton from './DeleteButton.jsx'
 import { openItemEditor } from '../utils/itemEditor.js'
 
 // 칸반의 한 열: 제목과 드래그 가능한 카드 목록
-export default function KanbanColumn({ column }) {
+export default function KanbanColumn({ column, onDelete }) {
   return (
     <section aria-label={column.title} className="rounded-xl bg-gray-800 p-3">
       <h3 className="mb-3 px-1 text-sm font-medium text-gray-400">
@@ -26,11 +27,12 @@ export default function KanbanColumn({ column }) {
                     {...dragProvided.draggableProps}
                     {...dragProvided.dragHandleProps}
                     onClick={() => openItemEditor('work', card)}
-                    className={`rounded-lg border border-gray-700 bg-gray-900 p-3 text-sm text-gray-200 ${
+                    className={`group relative rounded-lg border border-gray-700 bg-gray-900 p-3 text-sm text-gray-200 ${
                       dragSnapshot.isDragging ? 'border-gray-500 shadow-lg' : ''
                     }`}
                   >
-                    <p className="mb-2">{card.title || '제목 없음'}</p>
+                    <p className="mb-2 pr-6 lg:pr-0">{card.title || '제목 없음'}</p>
+                    <DeleteButton onDelete={() => onDelete(card.id)} label={`${card.title || '제목 없음'} 삭제`} className="absolute right-1.5 top-1.5 bg-gray-900" />
                     <ProgressBar progress={card.progress} />
                   </li>
                 )}

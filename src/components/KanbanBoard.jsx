@@ -4,6 +4,7 @@ import KanbanColumn from './KanbanColumn.jsx'
 import Skeleton from './Skeleton.jsx'
 import EmptyState from './EmptyState.jsx'
 import useRows from '../hooks/useRows.js'
+import useRowDelete from '../hooks/useRowDelete.js'
 import { updateRow } from '../lib/db.js'
 
 // 열 id는 DB의 status 값과 같고, 열마다 진행률(progress)이 정해져 있다.
@@ -17,6 +18,8 @@ const statusColumns = [
 // 카드를 다른 열로 끌면 status와 progress(0/50/100)가 DB에 함께 저장된다.
 export default function KanbanBoard() {
   const { rows, setRows, isLoading, reload } = useRows('work')
+
+  const handleDelete = useRowDelete('work', setRows)
 
   const handleDragEnd = async ({ source, destination, draggableId }) => {
     if (!destination || destination.droppableId === source.droppableId) return
@@ -53,6 +56,7 @@ export default function KanbanBoard() {
             {statusColumns.map((column) => (
               <KanbanColumn
                 key={column.id}
+                onDelete={handleDelete}
                 column={{ ...column, cards: rows.filter((row) => row.status === column.id) }}
               />
             ))}

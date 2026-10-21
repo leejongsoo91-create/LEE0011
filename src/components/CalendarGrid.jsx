@@ -1,5 +1,7 @@
 import Skeleton from './Skeleton.jsx'
 import EmptyState from './EmptyState.jsx'
+import { X } from 'lucide-react'
+import useRowDelete from '../hooks/useRowDelete.js'
 import useRows from '../hooks/useRows.js'
 
 const weekdays = ['월', '화', '수', '목', '금', '토', '일']
@@ -16,14 +18,14 @@ function buildCells(year, month) {
 
 // 월간 달력 그리드. schedule 테이블의 일정이 해당 날짜 칸에 표시된다.
 export default function CalendarGrid() {
-  const { rows, isLoading } = useRows('schedule')
+  const { rows, setRows, isLoading } = useRows('schedule')
+  const handleDelete = useRowDelete('schedule', setRows)
   const today = new Date()
   const year = today.getFullYear()
   const month = today.getMonth()
   const cells = buildCells(year, month)
 
-  const titlesOf = (date) =>
-    rows.filter((row) => row.date === `${year}-${pad(month + 1)}-${pad(date)}`).map((row) => row.title || '제목 없음')
+  const eventsOf = (date) => rows.filter((row) => row.date === `${year}-${pad(month + 1)}-${pad(date)}`)
 
   return (
     <section aria-label="월간 달력" className="mx-auto max-w-4xl pb-8">
@@ -50,9 +52,17 @@ export default function CalendarGrid() {
               }`}
             >
               {date}
-              {titlesOf(date).slice(0, 2).map((title, i) => (
-                <span key={i} className="truncate rounded bg-indigo-500/20 px-1 text-[10px] text-indigo-300 lg:text-xs">
-                  {title}
+              {eventsOf(date).slice(0, 2).map((row) => (
+                <span key={row.id} className="flex items-center gap-0.5 rounded bg-indigo-500/20 px-1 text-[10px] text-indigo-300 lg:text-xs">
+                  <span className="min-w-0 flex-1 truncate">{row.title || '제목 없음'}</span>
+                  <button
+                    type="button"
+                    aria-label={`${row.title || '제목 없음'} 삭제`}
+                    onClick={() => handleDelete(row.id)}
+                    className="shrink-0 rounded text-indigo-300/60 hover:text-red-400"
+                  >
+                    <X className="h-3 w-3" aria-hidden="true" />
+                  </button>
                 </span>
               ))}
             </div>

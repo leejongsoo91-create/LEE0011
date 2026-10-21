@@ -4,12 +4,12 @@ import { X } from 'lucide-react'
 import useRowDelete from '../hooks/useRowDelete.js'
 import useRows from '../hooks/useRows.js'
 
-const weekdays = ['월', '화', '수', '목', '금', '토', '일']
+const weekdays = ['일', '월', '화', '수', '목', '금', '토']
 const pad = (value) => String(value).padStart(2, '0')
 
-// 이번 달 1일 앞의 빈 칸(월요일 시작 기준)과 날짜 목록을 만든다.
+// 이번 달 1일 앞의 빈 칸(일요일 시작 기준)과 날짜 목록을 만든다.
 function buildCells(year, month) {
-  const offset = (new Date(year, month, 1).getDay() + 6) % 7
+  const offset = new Date(year, month, 1).getDay()
   const lastDate = new Date(year, month + 1, 0).getDate()
   const blanks = Array.from({ length: offset }, () => null)
   const dates = Array.from({ length: lastDate }, (_, index) => index + 1)

@@ -18,7 +18,7 @@ export default function NotionPage({ name, columns }) {
 
 function PageBody({ path, name, columns }) {
   const [headings, setHeadings] = useState([])
-  const { status, doc, change, reload } = usePageDoc(path)
+  const { status, doc, saveState, change, reload } = usePageDoc(path)
 
   // 저장된 제목을 빵부스러기에도 반영한다.
   useEffect(() => {
@@ -54,6 +54,7 @@ function PageBody({ path, name, columns }) {
 
   return (
     <article className="relative mx-auto flex max-w-4xl flex-col gap-8 py-4 lg:py-8">
+      <SaveStatus state={saveState} />
       <header>
         <TitleInput size="page" defaultValue={doc?.title ?? ''} onValueChange={handleTitle} />
       </header>
@@ -67,5 +68,20 @@ function PageBody({ path, name, columns }) {
       <NotionTable name={name} columns={columns} />
       <TocPanel headings={headings} />
     </article>
+  )
+}
+
+const statusText = { saving: '저장 중...', saved: '저장됨', error: '저장 실패' }
+
+// 우측 상단에 작게 보이는 자동 저장 상태 (위쪽 여백에 놓여 다른 내용을 밀지 않는다)
+function SaveStatus({ state }) {
+  return (
+    <p
+      role="status"
+      aria-live="polite"
+      className={`pointer-events-none absolute right-0 top-0 text-xs lg:top-2 ${state === 'error' ? 'text-red-400' : 'text-gray-500'}`}
+    >
+      {statusText[state] ?? ''}
+    </p>
   )
 }

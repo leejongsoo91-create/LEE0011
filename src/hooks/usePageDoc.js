@@ -13,6 +13,8 @@ export default function usePageDoc(path) {
   const pending = useRef({})
   const timer = useRef(null)
   const isSaving = useRef(false)
+  // 저장 상태: idle(변경 없음) → saving(입력/저장 중) → saved(저장됨), 실패하면 error
+  const [saveState, setSaveState] = useState('idle')
 
   const load = useCallback(async () => {
     setState({ status: 'loading', doc: null })
@@ -38,10 +40,12 @@ export default function usePageDoc(path) {
       try {
         await savePage(path, values)
         saved = true
+        if (Object.keys(pending.current).length === 0) setSaveState('saved')
       } catch {
         // 실패한 변경분은 되돌려 두되, 그 사이에 더 새로 입력된 값은 유지한다.
         pending.current = { ...values, ...pending.current }
         if (!silent) {
+          setSaveState('error')
           toast.error('자동 저장에 실패했습니다. 잠시 후 다시 시도합니다', { id: 'autosave-error' })
           timer.current = setTimeout(flush, RETRY_MS)
         }
@@ -61,6 +65,7 @@ export default function usePageDoc(path) {
   const change = useCallback(
     (field, value) => {
       pending.current[field] = value
+      setSaveState('saving')
       clearTimeout(timer.current)
       timer.current = setTimeout(flush, DEBOUNCE_MS)
     },
@@ -79,5 +84,5 @@ export default function usePageDoc(path) {
     }
   }, [flush])
 
-  return { ...state, change, reload: load }
+  return { ...state, saveState, change, reload: load }
 }

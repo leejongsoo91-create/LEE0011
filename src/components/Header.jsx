@@ -1,5 +1,6 @@
 import Breadcrumb from './Breadcrumb.jsx'
 import ThemeToggle from './ThemeToggle.jsx'
+import SettingsLink from './SettingsLink.jsx'
 import LogoutButton from './LogoutButton.jsx'
 
 // 빵부스러기와 테마 전환·로그아웃 버튼을 가진 상단 헤더
@@ -9,6 +10,7 @@ export default function Header() {
       <Breadcrumb />
       <div className="flex shrink-0 items-center gap-1">
         <ThemeToggle />
+        <SettingsLink />
         <LogoutButton />
       </div>
     </header>

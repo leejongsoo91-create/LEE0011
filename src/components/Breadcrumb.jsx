@@ -11,7 +11,8 @@ export default function Breadcrumb() {
   const { pathname } = useLocation()
   const [title, setTitle] = useState(() => loadTitle(pathname))
   const currentItem = navItems.find((item) => item.to === pathname) ?? navItems[0]
-  const isHome = currentItem.to === '/'
+  const isSettings = pathname === '/settings'
+  const isHome = currentItem.to === '/' && !isSettings
 
   useEffect(() => {
     const sync = () => setTitle(loadTitle(pathname))
@@ -22,10 +23,16 @@ export default function Breadcrumb() {
 
   return (
     <nav aria-label="빵부스러기" className="min-w-0">
-      <h1 className="sr-only">{currentItem.label}</h1>
+      <h1 className="sr-only">{isSettings ? '설정' : currentItem.label}</h1>
       <ol className="flex min-w-0 items-center gap-1.5 text-sm">
         {isHome ? (
           <li aria-current="page" className="font-semibold text-white">Home</li>
+        ) : isSettings ? (
+          <>
+            <li className={linkClass}><Link to="/">Home</Link></li>
+            <ChevronRight className="h-4 w-4 shrink-0 text-gray-600" aria-hidden="true" />
+            <li aria-current="page" className="font-semibold text-white">설정</li>
+          </>
         ) : (
           <>
             <li className={linkClass}><Link to="/">Home</Link></li>

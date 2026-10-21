@@ -6,7 +6,7 @@ export default function BottomTab() {
   return (
     <nav
       aria-label="하단 메뉴"
-      className="fixed inset-x-0 bottom-0 z-30 flex h-16 border-t border-gray-700 bg-gray-800 lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 flex h-16 box-content pb-[env(safe-area-inset-bottom)] border-t border-gray-700 bg-gray-800 lg:hidden"
     >
       {navItems.map(({ to, label, icon: Icon }) => (
         <NavLink

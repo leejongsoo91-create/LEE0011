@@ -35,6 +35,32 @@ function buildValues(table, { title, schedule, content, investment }) {
   }
 }
 
+// 일정의 시간·알림 컬럼은 나중에 추가된 것이라, 데이터베이스에 아직 없을 수 있다.
+const optionalColumns = ['remind_before_min', 'time']
+
+// 새 행을 저장한다. 데이터베이스에 없는 선택 컬럼(time, remind_before_min) 때문에 거절되면
+// 그 값만 빼고 다시 저장하고, 빠진 컬럼 이름을 함께 돌려줘서 안내할 수 있게 한다.
+async function insertWithFallback(table, values) {
+  const current = { ...values }
+  const dropped = []
+  for (;;) {
+    try {
+      return { dropped, row: await insertRow(table, current) }
+    } catch (error) {
+      const column = /'([a-z_]+)' column/.exec(error?.message ?? '')?.[1]
+      if (!optionalColumns.includes(column) || !(column in current)) throw error
+      delete current[column]
+      dropped.push(column)
+    }
+  }
+}
+
+// 빠진 컬럼에 맞는 안내 문구 (일정은 저장됐지만 일부 값은 저장되지 않았다는 뜻)
+function describeDropped(dropped) {
+  if (dropped.includes('time')) return '일정은 저장됐지만 시간은 저장되지 않았어요. Supabase의 schedule 테이블에 time 컬럼이 필요해요'
+  return '일정은 저장됐지만 알림 설정은 저장되지 않았어요. Supabase에서 알림용 SQL(remind_before_min 컬럼)을 실행해 주세요'
+}
+
 // 모달의 입력값을 Supabase에 저장(추가 또는 수정)한다. 저장 중에는 isSaving이 true.
 export default function useItemSave({ editing, onSaved }) {
   const { pathname } = useLocation()
@@ -57,18 +83,26 @@ export default function useItemSave({ editing, onSaved }) {
     }
     const title = input.title.trim() || '제목 없음'
     setIsSaving(true)
+    let dropped = []
     try {
       if (editing) {
         await updateRow(table, editing.row.id, input.content ? { title, content: input.content } : { title })
       } else {
-        await insertRow(table, buildValues(table, { ...input, title }))
+        const result = await insertWithFallback(table, buildValues(table, { ...input, title }))
+        dropped = result.dropped
         // 새 일정이 저장된 뒤에만 텔레그램 알림을 보낸다. 기다리지 않으므로 화면 동작은 그대로다.
-        if (table === 'schedule') notifyScheduleAdded({ title, date: input.schedule.date, time: input.schedule.time })
+        if (table === 'schedule') {
+          const time = dropped.includes('time') ? '' : input.schedule.time
+          notifyScheduleAdded({ title, date: input.schedule.date, time })
+        }
       }
       notifyDataChange()
       toast(editing ? '성공적으로 수정되었습니다' : '성공적으로 추가되었습니다')
+      if (dropped.length > 0) toast.warning(describeDropped(dropped), { duration: 9000 })
       onSaved()
-    } catch {
+    } catch (error) {
+      // 원인을 개발자 도구(F12) 콘솔에서 확인할 수 있게 남긴다.
+      console.error('[저장 실패]', table, error)
       toast.error('저장에 실패했습니다. 잠시 후 다시 시도해 주세요')
       setIsSaving(false)
     }

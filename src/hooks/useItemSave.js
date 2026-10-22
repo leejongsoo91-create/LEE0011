@@ -108,9 +108,11 @@ export default function useItemSave({ editing, onSaved }) {
         const values =
           table === 'schedule'
             ? buildScheduleUpdate(editing.row, input.schedule, title)
-            : input.content
+            : table === 'investments'
+              ? buildValues('investments', { title, investment: input.investment })
+              : input.content
               ? { title, content: input.content }
-              : { title }
+                : { title }
         dropped = (await saveWithFallback(values, (current) => updateRow(table, editing.row.id, current))).dropped
       } else {
         const result = await saveWithFallback(buildValues(table, { ...input, title }), (current) => insertRow(table, current))
@@ -122,7 +124,7 @@ export default function useItemSave({ editing, onSaved }) {
         }
       }
       notifyDataChange()
-      toast(editing ? (table === 'schedule' ? '일정이 수정되었습니다' : '성공적으로 수정되었습니다') : '성공적으로 추가되었습니다')
+      toast(editing ? (table === 'schedule' ? '일정이 수정되었습니다' : table === 'investments' ? '종목이 수정되었습니다' : '성공적으로 수정되었습니다') : '성공적으로 추가되었습니다')
       if (dropped.length > 0) toast.warning(describeDropped(dropped), { duration: 9000 })
       onSaved()
     } catch (error) {

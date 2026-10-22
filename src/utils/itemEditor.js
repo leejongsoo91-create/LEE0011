@@ -13,3 +13,8 @@ export function openAddModal(prefill = null) {
 export function openScheduleView(row) {
   window.dispatchEvent(new CustomEvent('viewschedule', { detail: row }))
 }
+
+// 달력의 '+N개'를 눌렀을 때 Layout의 하루 일정 목록 모달을 열도록 알린다. (date: 'YYYY-MM-DD')
+export function openDayList(date) {
+  window.dispatchEvent(new CustomEvent('viewday', { detail: date }))
+}

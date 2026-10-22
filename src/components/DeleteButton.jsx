@@ -11,7 +11,7 @@ export default function DeleteButton({ onDelete, label = '삭제', className = '
         event.stopPropagation()
         onDelete()
       }}
-      className={`rounded p-1 text-gray-600 transition-colors hover:bg-gray-700 hover:text-red-400 focus-visible:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 ${className}`}
+      className={`rounded p-1 text-gray-400 transition-colors hover:bg-gray-700 hover:text-red-400 focus-visible:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 ${className}`}
     >
       <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
     </button>

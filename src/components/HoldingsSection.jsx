@@ -1,8 +1,10 @@
 import DataState from './DataState.jsx'
 import InvestmentChart from './InvestmentChart.jsx'
+import { Pencil } from 'lucide-react'
 import DeleteButton from './DeleteButton.jsx'
 import useRowDelete from '../hooks/useRowDelete.js'
 import useRows from '../hooks/useRows.js'
+import { openItemEditor } from '../utils/itemEditor.js'
 
 // investments 테이블의 보유 종목 비중을 보여주는 섹션
 export default function HoldingsSection() {
@@ -22,7 +24,7 @@ export default function HoldingsSection() {
                 <th scope="col" className="px-3 py-2 font-medium">티커</th>
                 <th scope="col" className="px-3 py-2 text-right font-medium">평단가</th>
                 <th scope="col" className="px-3 py-2 text-right font-medium">수량</th>
-                <th scope="col" className="w-10 px-1 py-2"><span className="sr-only">삭제</span></th>
+                <th scope="col" className="w-20 px-1 py-2"><span className="sr-only">수정, 삭제</span></th>
               </tr>
             </thead>
             <tbody>
@@ -34,6 +36,14 @@ export default function HoldingsSection() {
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-gray-300">{Number(row.quantity) || 0}주</td>
                   <td className="px-1 py-2 text-right">
+                    <button
+                      type="button"
+                      aria-label={`${row.ticker} 수정`}
+                      onClick={() => openItemEditor('investments', row)}
+                      className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-700 hover:text-white focus-visible:opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+                    >
+                      <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
                     <DeleteButton onDelete={() => handleDelete(row.id)} label={`${row.ticker} 삭제`} />
                   </td>
                 </tr>

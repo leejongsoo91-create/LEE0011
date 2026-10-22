@@ -7,6 +7,7 @@ import Header from './Header.jsx'
 import Fab from './Fab.jsx'
 import AddItemModal from './AddItemModal.jsx'
 import ScheduleViewModal from './ScheduleViewModal.jsx'
+import DayEventsModal from './DayEventsModal.jsx'
 import CommandPalette from './CommandPalette.jsx'
 import useTheme from '../hooks/useTheme.js'
 
@@ -15,6 +16,7 @@ export default function Layout() {
   const [editing, setEditing] = useState(null)
   const [prefill, setPrefill] = useState(null)
   const [viewingSchedule, setViewingSchedule] = useState(null)
+  const [viewingDay, setViewingDay] = useState(null)
   const theme = useTheme()
 
   // 카드를 누르면(edititem) 편집 모달, '+ 새로 만들기'나 달력 빈 칸을 두 번 누르면(additem) 추가 모달,
@@ -29,10 +31,13 @@ export default function Layout() {
       setIsModalOpen(true)
     }
     const handleView = (event) => setViewingSchedule(event.detail)
+    const handleDay = (event) => setViewingDay(event.detail)
+    window.addEventListener('viewday', handleDay)
     window.addEventListener('edititem', handleEdit)
     window.addEventListener('additem', handleAdd)
     window.addEventListener('viewschedule', handleView)
     return () => {
+      window.removeEventListener('viewday', handleDay)
       window.removeEventListener('edititem', handleEdit)
       window.removeEventListener('additem', handleAdd)
       window.removeEventListener('viewschedule', handleView)
@@ -59,6 +64,7 @@ export default function Layout() {
       <BottomTab />
       <Fab onClick={() => setIsModalOpen(true)} />
       {isModalOpen && <AddItemModal key={editing?.row.id ?? 'new'} editing={editing} prefill={prefill} onClose={closeModal} />}
+      {viewingDay && <DayEventsModal date={viewingDay} onClose={() => setViewingDay(null)} />}
       {viewingSchedule && <ScheduleViewModal row={viewingSchedule} onClose={() => setViewingSchedule(null)} />}
     </>
   )

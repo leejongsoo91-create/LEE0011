@@ -10,12 +10,20 @@ import { emptySchedule, scheduleFromRow } from '../utils/scheduleForm.js'
 // 노션 페이지처럼 큰 제목 입력칸과 블록 에디터를 가진 빠른 추가/편집 모달.
 // editing을 주면 기존 항목을 불러와 수정한다. 닫기 버튼, 배경 클릭, ESC 키로 닫을 수 있다.
 export default function AddItemModal({ onClose, editing, prefill }) {
-  const [title, setTitle] = useState(editing?.row.title ?? '')
+  const [title, setTitle] = useState(editing?.table === 'investments' ? (editing.row.name ?? '') : (editing?.row.title ?? ''))
   // 일정을 편집할 때는 저장된 날짜·시간·알림으로 채우고, 새로 만들 때는 (미리 정해진 날짜 또는 오늘) 기본값으로 연다.
   const [schedule, setSchedule] = useState(() =>
     editing?.table === 'schedule' ? scheduleFromRow(editing.row) : emptySchedule(prefill?.date),
   )
-  const [investment, setInvestment] = useState({ ticker: '', avg_price: '', quantity: '' })
+  const [investment, setInvestment] = useState(() =>
+    editing?.table === 'investments'
+      ? {
+          ticker: editing.row.ticker ?? '',
+          avg_price: editing.row.avg_price == null ? '' : String(editing.row.avg_price),
+          quantity: editing.row.quantity == null ? '' : String(editing.row.quantity),
+        }
+      : { ticker: '', avg_price: '', quantity: '' },
+  )
   const contentRef = useRef(null)
   const { table, save, isSaving } = useItemSave({ editing, onSaved: onClose })
 
@@ -48,7 +56,7 @@ export default function AddItemModal({ onClose, editing, prefill }) {
       >
         <header className="flex items-center justify-between">
           <h2 id="add-item-title" className="text-sm font-medium text-gray-400">
-            {editing ? '항목 편집' : '새 항목 추가'}
+            {editing ? (editing.table === 'schedule' ? '일정 수정' : editing.table === 'investments' ? '종목 수정' : '항목 편집') : '새 항목 추가'}
           </h2>
           <button
             type="button"

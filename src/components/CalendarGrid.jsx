@@ -1,10 +1,11 @@
 import Skeleton from './Skeleton.jsx'
 import EmptyState from './EmptyState.jsx'
-import { X } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import useRowDelete from '../hooks/useRowDelete.js'
 import useRows from '../hooks/useRows.js'
 import useDoubleTap from '../hooks/useDoubleTap.js'
-import { openAddModal, openScheduleView } from '../utils/itemEditor.js'
+import { openAddModal, openDayList, openScheduleView } from '../utils/itemEditor.js'
 
 const weekdays = ['일', '월', '화', '수', '목', '금', '토']
 const pad = (value) => String(value).padStart(2, '0')
@@ -24,8 +25,14 @@ export default function CalendarGrid() {
   const handleDelete = useRowDelete('schedule', setRows)
   const isDoubleTap = useDoubleTap()
   const today = new Date()
-  const year = today.getFullYear()
-  const month = today.getMonth()
+  // 보고 있는 달 (처음엔 이번 달). 달을 넘어가도 Date가 연도를 알아서 맞춰 준다.
+  const [view, setView] = useState({ year: today.getFullYear(), month: today.getMonth() })
+  const { year, month } = view
+  const isThisMonth = year === today.getFullYear() && month === today.getMonth()
+  const moveMonth = (delta) => {
+    const next = new Date(year, month + delta, 1)
+    setView({ year: next.getFullYear(), month: next.getMonth() })
+  }
   const cells = buildCells(year, month)
 
   // 그 날의 일정을 시간순으로 정렬한다. (시간이 없는 종일 일정이 맨 앞)
@@ -37,16 +44,27 @@ export default function CalendarGrid() {
 
   return (
     <section aria-label="월간 달력" className="mx-auto max-w-4xl pb-8">
-      <div className="mb-4 flex items-center gap-3">
-        <h2 className="text-xl font-bold text-gray-100">
+      <div className="mb-4 flex items-center gap-2">
+        <button type="button" onClick={() => moveMonth(-1)} aria-label="이전 달" className="rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white">
+          <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+        </button>
+        <h2 className="min-w-28 text-center text-xl font-bold text-gray-100" aria-live="polite">
           {year}년 {month + 1}월
         </h2>
+        <button type="button" onClick={() => moveMonth(1)} aria-label="다음 달" className="rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white">
+          <ChevronRight className="h-5 w-5" aria-hidden="true" />
+        </button>
+        {!isThisMonth && (
+          <button type="button" onClick={() => setView({ year: today.getFullYear(), month: today.getMonth() })} className="rounded-lg border border-gray-600 px-2.5 py-1 text-xs text-gray-300 transition-colors hover:bg-gray-700">
+            오늘
+          </button>
+        )}
         {isLoading && <Skeleton className="h-4 w-24" />}
       </div>
-      <p className="-mt-2 mb-4 text-xs text-gray-500">날짜 칸을 두 번 누르면 일정 추가, 일정을 두 번 누르면 상세 보기·삭제</p>
+      <p className="-mt-2 mb-4 text-xs text-gray-400">날짜 칸을 두 번 누르면 일정 추가, 일정을 두 번 누르면 상세 보기·삭제</p>
       <div className="grid grid-cols-7 gap-1 lg:gap-2">
         {weekdays.map((day) => (
-          <div key={day} className="py-2 text-center text-xs font-medium text-gray-500">
+          <div key={day} className="py-2 text-center text-xs font-medium text-gray-400">
             {day}
           </div>
         ))}
@@ -58,7 +76,7 @@ export default function CalendarGrid() {
               key={date}
               onClick={(event) => isDoubleTap(`day-${date}`, event.timeStamp) && openAddModal({ date: dateString(date) })}
               className={`touch-manipulation select-none flex min-h-16 min-w-0 flex-col gap-1 rounded-lg border bg-gray-800 p-1.5 text-xs text-gray-300 lg:min-h-24 lg:p-2 lg:text-sm ${
-                date === today.getDate() ? 'border-gray-400 text-white' : 'border-gray-700'
+                isThisMonth && date === today.getDate() ? 'border-gray-400 text-white' : 'border-gray-700'
               }`}
             >
               {date}
@@ -88,6 +106,18 @@ export default function CalendarGrid() {
                   </button>
                 </span>
               ))}
+              {eventsOf(date).length > 2 && (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    openDayList(dateString(date))
+                  }}
+                  className="rounded px-1 text-left text-[10px] text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-200 lg:text-xs"
+                >
+                  +{eventsOf(date).length - 2}개
+                </button>
+              )}
             </div>
           ),
         )}

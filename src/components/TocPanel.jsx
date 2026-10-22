@@ -14,7 +14,7 @@ export default function TocPanel({ headings }) {
       <nav className="sticky top-24 rounded-xl border border-gray-700 p-3">
         <p className="mb-2 text-xs font-semibold text-gray-400">목차</p>
         {headings.length === 0 ? (
-          <p className="text-xs text-gray-600">제목(H1~H3)을 추가하면 여기에 표시됩니다.</p>
+          <p className="text-xs text-gray-400">제목(H1~H3)을 추가하면 여기에 표시됩니다.</p>
         ) : (
           <ul className="flex flex-col gap-1.5">
             {headings.map((heading) => (

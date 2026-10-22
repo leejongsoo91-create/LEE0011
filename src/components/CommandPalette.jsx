@@ -37,12 +37,12 @@ export default function CommandPalette() {
         className="w-full border-b border-gray-700 bg-transparent px-4 py-4 text-gray-100 outline-none placeholder:text-gray-500"
       />
       <Command.List className="max-h-72 overflow-y-auto p-2">
-        <Command.Empty className="px-3 py-6 text-center text-sm text-gray-500">
+        <Command.Empty className="px-3 py-6 text-center text-sm text-gray-400">
           결과가 없습니다.
         </Command.Empty>
         <Command.Group
           heading="페이지 이동"
-          className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-gray-500"
+          className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-gray-400"
         >
           {navItems.map(({ to, label, icon: Icon }) => (
             <Command.Item

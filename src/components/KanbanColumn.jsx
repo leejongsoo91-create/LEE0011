@@ -8,7 +8,7 @@ export default function KanbanColumn({ column, onDelete }) {
   return (
     <section aria-label={column.title} className="rounded-xl bg-gray-800 p-3">
       <h3 className="mb-3 px-1 text-sm font-medium text-gray-400">
-        {column.title} <span className="text-gray-600">{column.cards.length}</span>
+        {column.title} <span className="text-gray-400">{column.cards.length}</span>
       </h3>
       <Droppable droppableId={column.id}>
         {(provided, snapshot) => (

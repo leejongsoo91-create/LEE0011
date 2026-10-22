@@ -35,6 +35,7 @@ export default function NotionEditor({ initialContent, onDocumentChange, onHeadi
     schema: editorSchema,
     dictionary,
     extensions: [syntaxHighlighter],
+    domAttributes: { editor: { 'aria-label': '본문 에디터' } },
     initialContent: Array.isArray(initialContent) && initialContent.length > 0 ? initialContent : undefined,
   })
 

@@ -42,7 +42,7 @@ export default function NotionTable({ name, columns }) {
       <button
         type="button"
         onClick={() => openAddModal()}
-        className="mt-1 w-full rounded-md px-3 py-2 text-left text-sm text-gray-500 transition-colors hover:bg-gray-800 hover:text-gray-300"
+        className="mt-1 w-full rounded-md px-3 py-2 text-left text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-gray-300"
       >
         + 새로 만들기
       </button>

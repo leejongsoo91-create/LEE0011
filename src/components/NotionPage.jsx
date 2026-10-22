@@ -79,7 +79,7 @@ function SaveStatus({ state }) {
     <p
       role="status"
       aria-live="polite"
-      className={`pointer-events-none absolute right-0 top-0 text-xs lg:top-2 ${state === 'error' ? 'text-red-400' : 'text-gray-500'}`}
+      className={`pointer-events-none absolute right-0 top-0 text-xs lg:top-2 ${state === 'error' ? 'text-red-400' : 'text-gray-400'}`}
     >
       {statusText[state] ?? ''}
     </p>

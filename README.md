@@ -69,7 +69,7 @@
 | `work` | 업무 / 프로젝트 | `title`, `status` (Todo · In Progress · Done), `progress`, `content` |
 | `hobbies` | 취미 / 학습 | `title`, `details`, `content` |
 | `investments` | 투자 | `ticker`, `name`, `avg_price`, `quantity` |
-| `schedule` | 일정 | `title`, `date` |
+| `schedule` | 일정 | `title`, `date`, `time`, `remind_before_min`, `reminded_at` |
 | `pages` | 페이지 본문·제목 자동 저장 | `path`, `title`, `content` |
 
 모든 테이블에 `id`, `user_id`, `created_at`이 있습니다. 초기 상태는 **완전히 빈 테이블**입니다.
@@ -121,6 +121,8 @@ Supabase **SQL Editor**에서 `supabase/migrations/` 폴더의 파일을 **순�
 | 1 | `20261021000000_create_core_tables.sql` | 핵심 테이블 4개 생성 |
 | 2 | `20261021010000_add_user_id_and_auth_policies.sql` | `user_id` 추가, RLS(내 데이터만 접근) 적용 |
 | 3 | `20261022000000_create_pages_and_delete_account.sql` | `pages` 테이블, 계정 삭제 함수 `delete_my_account()` |
+| 4 | `20261023000000_add_schedule_time_and_reminders.sql` | 일정의 시간·알림 컬럼 |
+| 5 | `20261023010000_schedule_reminder_cron.sql` | (선택) 1분마다 알림 확인 예약 |
 
 ### 4. 로그인 설정
 
@@ -139,17 +141,21 @@ npm run preview   # 빌드 결과 미리보기
 
 ### 🔔 텔레그램 일정 알림 (선택)
 
-Schedule에서 새 일정을 등록하면 텔레그램으로 알림이 옵니다.
+- **등록 알림**: Schedule에서 새 일정을 등록하면 바로 알림이 옵니다.
+- **시간 맞춤 알림**: 일정에 시간을 넣고 `정시에 / 10분 전 / 30분 전 / 1시간 전`을 고르면, 그 시각에 맞춰 알림이 옵니다. (시간 기준은 한국 시간)
 
 ```text
-📅 [새로운 일정 등록]
+⏰ [일정 알림]
 날짜: 2026년 10월 23일
-내용: 일정 제목
+시간: 오후 3시 30분
+내용: 치과 예약
+알림: 10분 후 시작합니다
 ```
 
-- 알림은 Vercel **서버 함수**(`api/notify-schedule.js`)가 보냅니다. 봇 토큰이 브라우저 코드에 들어가지 않도록 `VITE_` 접두사 없이 **Vercel 환경변수**에만 등록합니다.
-- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`를 등록한 뒤 다시 배포하세요. 로그인한 사용자만 호출할 수 있습니다.
-- 전송에 실패해도 일정 저장과 화면 동작에는 영향이 없습니다. 로컬 `npm run dev`에서는 서버 함수가 없어 알림이 가지 않습니다.
+- 알림은 Vercel **서버 함수**(`api/notify-schedule.js`, `api/send-reminders.js`)가 보냅니다. 봇 토큰이 브라우저 코드에 들어가지 않도록 `VITE_` 접두사 없이 **Vercel 환경변수**에만 등록합니다.
+- 등록 알림에 필요한 환경변수: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
+- 시간 맞춤 알림에 추가로 필요한 것: `CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` 환경변수, 그리고 Supabase `pg_cron`이 1분마다 서버 함수를 부르도록 하는 SQL(`20261023010000_schedule_reminder_cron.sql`, 주소와 시크릿을 내 값으로 바꿔 실행)
+- 전송에 실패해도 일정 저장과 화면 동작에는 영향이 없고, 같은 알림이 두 번 가지 않습니다. 로컬 `npm run dev`에서는 서버 함수가 없어 알림이 가지 않습니다.
 
 ### 📲 스마트폰에 앱으로 설치
 

@@ -13,7 +13,7 @@ const tableByPath = {
 }
 
 // 테이블별 새 행의 기본값
-function buildValues(table, { title, date, content, investment }) {
+function buildValues(table, { title, schedule, content, investment }) {
   if (table === 'work') return { title, status: 'Todo', progress: 0, content }
   if (table === 'hobbies') return { title, details: '', content }
   if (table === 'investments') {
@@ -24,7 +24,15 @@ function buildValues(table, { title, date, content, investment }) {
       quantity: Number(investment.quantity) || 0,
     }
   }
-  return { title, date }
+  // 시간을 정하지 않은 일정은 종일 일정이라 알림도 없다.
+  // (시간 칸이 없는 일정은 새 컬럼을 보내지 않아, 데이터베이스 업데이트 전에도 저장된다.)
+  if (!schedule.time) return { title, date: schedule.date }
+  return {
+    title,
+    date: schedule.date,
+    time: schedule.time,
+    remind_before_min: schedule.remind === '' ? null : Number(schedule.remind),
+  }
 }
 
 // 모달의 입력값을 Supabase에 저장(추가 또는 수정)한다. 저장 중에는 isSaving이 true.
@@ -43,7 +51,7 @@ export default function useItemSave({ editing, onSaved }) {
       toast.error('티커를 입력해 주세요')
       return
     }
-    if (table === 'schedule' && !input.date) {
+    if (table === 'schedule' && !input.schedule.date) {
       toast.error('날짜를 선택해 주세요')
       return
     }
@@ -55,7 +63,7 @@ export default function useItemSave({ editing, onSaved }) {
       } else {
         await insertRow(table, buildValues(table, { ...input, title }))
         // 새 일정이 저장된 뒤에만 텔레그램 알림을 보낸다. 기다리지 않으므로 화면 동작은 그대로다.
-        if (table === 'schedule') notifyScheduleAdded({ title, date: input.date })
+        if (table === 'schedule') notifyScheduleAdded({ title, date: input.schedule.date, time: input.schedule.time })
       }
       notifyDataChange()
       toast(editing ? '성공적으로 수정되었습니다' : '성공적으로 추가되었습니다')

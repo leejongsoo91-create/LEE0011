@@ -25,7 +25,11 @@ export default function CalendarGrid() {
   const month = today.getMonth()
   const cells = buildCells(year, month)
 
-  const eventsOf = (date) => rows.filter((row) => row.date === `${year}-${pad(month + 1)}-${pad(date)}`)
+  // 그 날의 일정을 시간순으로 정렬한다. (시간이 없는 종일 일정이 맨 앞)
+  const eventsOf = (date) =>
+    rows
+      .filter((row) => row.date === `${year}-${pad(month + 1)}-${pad(date)}`)
+      .sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''))
 
   return (
     <section aria-label="월간 달력" className="mx-auto max-w-4xl pb-8">
@@ -54,7 +58,10 @@ export default function CalendarGrid() {
               {date}
               {eventsOf(date).slice(0, 2).map((row) => (
                 <span key={row.id} className="flex items-center gap-0.5 rounded bg-indigo-500/20 px-1 text-[10px] text-indigo-300 lg:text-xs">
-                  <span className="min-w-0 flex-1 truncate">{row.title || '제목 없음'}</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {row.time && <span className="mr-1 text-indigo-200/70">{row.time.slice(0, 5)}</span>}
+                    {row.title || '제목 없음'}
+                  </span>
                   <button
                     type="button"
                     aria-label={`${row.title || '제목 없음'} 삭제`}

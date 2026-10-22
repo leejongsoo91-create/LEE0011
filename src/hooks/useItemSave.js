@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { insertRow, notifyDataChange, updateRow } from '../lib/db.js'
+import { notifyScheduleAdded } from '../lib/notify.js'
 
 // 현재 페이지(경로)에 따라 항목이 저장될 테이블
 const tableByPath = {
@@ -53,6 +54,8 @@ export default function useItemSave({ editing, onSaved }) {
         await updateRow(table, editing.row.id, input.content ? { title, content: input.content } : { title })
       } else {
         await insertRow(table, buildValues(table, { ...input, title }))
+        // 새 일정이 저장된 뒤에만 텔레그램 알림을 보낸다. 기다리지 않으므로 화면 동작은 그대로다.
+        if (table === 'schedule') notifyScheduleAdded({ title, date: input.date })
       }
       notifyDataChange()
       toast(editing ? '성공적으로 수정되었습니다' : '성공적으로 추가되었습니다')

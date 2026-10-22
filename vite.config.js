@@ -32,6 +32,7 @@ export default defineConfig({
         // 스크립트(js)는 처음 쓸 때 캐시에 쌓이고, Supabase 요청은 항상 네트워크로 가서 데이터가 낡지 않는다.
         globPatterns: ['**/*.{html,css,png,svg,woff2}'],
         navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {

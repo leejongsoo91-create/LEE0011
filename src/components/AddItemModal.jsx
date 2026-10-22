@@ -5,12 +5,16 @@ import NotionEditor from './NotionEditor.jsx'
 import InvestmentFields from './InvestmentFields.jsx'
 import ScheduleFields from './ScheduleFields.jsx'
 import useItemSave from '../hooks/useItemSave.js'
+import { emptySchedule, scheduleFromRow } from '../utils/scheduleForm.js'
 
 // 노션 페이지처럼 큰 제목 입력칸과 블록 에디터를 가진 빠른 추가/편집 모달.
 // editing을 주면 기존 항목을 불러와 수정한다. 닫기 버튼, 배경 클릭, ESC 키로 닫을 수 있다.
 export default function AddItemModal({ onClose, editing, prefill }) {
   const [title, setTitle] = useState(editing?.row.title ?? '')
-  const [schedule, setSchedule] = useState(() => ({ date: prefill?.date ?? new Date().toLocaleDateString('sv-SE'), time: '', remind: '0' }))
+  // 일정을 편집할 때는 저장된 날짜·시간·알림으로 채우고, 새로 만들 때는 (미리 정해진 날짜 또는 오늘) 기본값으로 연다.
+  const [schedule, setSchedule] = useState(() =>
+    editing?.table === 'schedule' ? scheduleFromRow(editing.row) : emptySchedule(prefill?.date),
+  )
   const [investment, setInvestment] = useState({ ticker: '', avg_price: '', quantity: '' })
   const contentRef = useRef(null)
   const { table, save, isSaving } = useItemSave({ editing, onSaved: onClose })

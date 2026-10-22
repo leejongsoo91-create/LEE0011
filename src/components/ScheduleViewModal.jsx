@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { toast } from 'sonner'
 import { deleteRow, notifyDataChange } from '../lib/db.js'
+import { openItemEditor } from '../utils/itemEditor.js'
 import { formatKoreanDate, formatKoreanTime } from '../utils/dateFormat.js'
 
-// 달력의 일정을 두 번 눌렀을 때 뜨는 모달: 제목, 날짜, 시간을 보여주고 삭제할 수 있다.
+// 달력의 일정을 두 번 눌렀을 때 뜨는 모달: 제목, 날짜, 시간을 보여주고 수정·삭제할 수 있다.
 // (폰에서는 좁은 일정 칩에 삭제 버튼을 둘 수 없어서 삭제를 여기에서 한다.)
 export default function ScheduleViewModal({ row, onClose }) {
   const [isDeleting, setIsDeleting] = useState(false)
@@ -14,6 +15,12 @@ export default function ScheduleViewModal({ row, onClose }) {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
+
+  // 상세 모달을 닫고, 같은 일정이 채워진 편집 모달(추가 모달의 편집 모드)을 연다.
+  const handleEdit = () => {
+    onClose()
+    openItemEditor('schedule', row)
+  }
 
   const handleDelete = async () => {
     if (isDeleting || !window.confirm('정말 삭제하시겠습니까?')) return
@@ -80,13 +87,23 @@ export default function ScheduleViewModal({ row, onClose }) {
           >
             {isDeleting ? '삭제 중...' : '삭제'}
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-white"
-          >
-            닫기
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleEdit}
+              disabled={isDeleting}
+              className="rounded-lg border border-gray-600 px-4 py-2 text-sm text-gray-200 transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              수정
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-white"
+            >
+              닫기
+            </button>
+          </div>
         </footer>
       </section>
     </div>

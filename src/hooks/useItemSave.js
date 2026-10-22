@@ -36,16 +36,16 @@ function buildValues(table, { title, schedule, content, investment }) {
 }
 
 // 일정의 시간·알림 컬럼은 나중에 추가된 것이라, 데이터베이스에 아직 없을 수 있다.
-const optionalColumns = ['remind_before_min', 'time']
+const optionalColumns = ['remind_before_min', 'time', 'reminded_at']
 
-// 새 행을 저장한다. 데이터베이스에 없는 선택 컬럼(time, remind_before_min) 때문에 거절되면
+// 저장(추가 또는 수정)을 실행한다. 데이터베이스에 없는 선택 컬럼 때문에 거절되면
 // 그 값만 빼고 다시 저장하고, 빠진 컬럼 이름을 함께 돌려줘서 안내할 수 있게 한다.
-async function insertWithFallback(table, values) {
+async function saveWithFallback(values, run) {
   const current = { ...values }
   const dropped = []
   for (;;) {
     try {
-      return { dropped, row: await insertRow(table, current) }
+      return { dropped, result: await run(current) }
     } catch (error) {
       const column = /'([a-z_]+)' column/.exec(error?.message ?? '')?.[1]
       if (!optionalColumns.includes(column) || !(column in current)) throw error
@@ -53,6 +53,24 @@ async function insertWithFallback(table, values) {
       dropped.push(column)
     }
   }
+}
+
+// 수정한 일정을 저장할 값으로 만든다.
+// 날짜·시간·알림 시점 중 하나라도 바뀌면 reminded_at을 비워서, 바뀐 시각에 알림이 다시 가게 한다.
+// (제목만 고쳤을 때는 그대로 두어 같은 알림이 또 가지 않는다.)
+function buildScheduleUpdate(row, schedule, title) {
+  const values = { title, date: schedule.date }
+  const time = schedule.time || null
+  const remind = time && schedule.remind !== '' ? Number(schedule.remind) : null
+  // 시간·알림 컬럼이 없는 데이터베이스에서는 시간을 쓰지 않는 한 그 컬럼을 건드리지 않는다.
+  if (time || 'time' in row) {
+    values.time = time
+    values.remind_before_min = remind
+    const changed =
+      row.date !== schedule.date || (row.time ? row.time.slice(0, 5) : null) !== time || (row.remind_before_min ?? null) !== remind
+    if (changed) values.reminded_at = null
+  }
+  return values
 }
 
 // 빠진 컬럼에 맞는 안내 문구 (일정은 저장됐지만 일부 값은 저장되지 않았다는 뜻)
@@ -86,9 +104,16 @@ export default function useItemSave({ editing, onSaved }) {
     let dropped = []
     try {
       if (editing) {
-        await updateRow(table, editing.row.id, input.content ? { title, content: input.content } : { title })
+        // 수정: 새로 만들지 않고, 편집 중인 항목의 id로 update 한다. (텔레그램 알림은 새 일정을 등록할 때만 보낸다.)
+        const values =
+          table === 'schedule'
+            ? buildScheduleUpdate(editing.row, input.schedule, title)
+            : input.content
+              ? { title, content: input.content }
+              : { title }
+        dropped = (await saveWithFallback(values, (current) => updateRow(table, editing.row.id, current))).dropped
       } else {
-        const result = await insertWithFallback(table, buildValues(table, { ...input, title }))
+        const result = await saveWithFallback(buildValues(table, { ...input, title }), (current) => insertRow(table, current))
         dropped = result.dropped
         // 새 일정이 저장된 뒤에만 텔레그램 알림을 보낸다. 기다리지 않으므로 화면 동작은 그대로다.
         if (table === 'schedule') {
@@ -97,7 +122,7 @@ export default function useItemSave({ editing, onSaved }) {
         }
       }
       notifyDataChange()
-      toast(editing ? '성공적으로 수정되었습니다' : '성공적으로 추가되었습니다')
+      toast(editing ? (table === 'schedule' ? '일정이 수정되었습니다' : '성공적으로 수정되었습니다') : '성공적으로 추가되었습니다')
       if (dropped.length > 0) toast.warning(describeDropped(dropped), { duration: 9000 })
       onSaved()
     } catch (error) {

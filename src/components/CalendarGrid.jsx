@@ -3,6 +3,8 @@ import EmptyState from './EmptyState.jsx'
 import { X } from 'lucide-react'
 import useRowDelete from '../hooks/useRowDelete.js'
 import useRows from '../hooks/useRows.js'
+import useDoubleTap from '../hooks/useDoubleTap.js'
+import { openAddModal, openScheduleView } from '../utils/itemEditor.js'
 
 const weekdays = ['일', '월', '화', '수', '목', '금', '토']
 const pad = (value) => String(value).padStart(2, '0')
@@ -20,15 +22,17 @@ function buildCells(year, month) {
 export default function CalendarGrid() {
   const { rows, setRows, isLoading } = useRows('schedule')
   const handleDelete = useRowDelete('schedule', setRows)
+  const isDoubleTap = useDoubleTap()
   const today = new Date()
   const year = today.getFullYear()
   const month = today.getMonth()
   const cells = buildCells(year, month)
 
   // 그 날의 일정을 시간순으로 정렬한다. (시간이 없는 종일 일정이 맨 앞)
+  const dateString = (date) => `${year}-${pad(month + 1)}-${pad(date)}`
   const eventsOf = (date) =>
     rows
-      .filter((row) => row.date === `${year}-${pad(month + 1)}-${pad(date)}`)
+      .filter((row) => row.date === dateString(date))
       .sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''))
 
   return (
@@ -39,6 +43,7 @@ export default function CalendarGrid() {
         </h2>
         {isLoading && <Skeleton className="h-4 w-24" />}
       </div>
+      <p className="-mt-2 mb-4 text-xs text-gray-500">날짜 칸을 두 번 누르면 일정 추가, 일정을 두 번 누르면 상세 보기·삭제</p>
       <div className="grid grid-cols-7 gap-1 lg:gap-2">
         {weekdays.map((day) => (
           <div key={day} className="py-2 text-center text-xs font-medium text-gray-500">
@@ -51,13 +56,21 @@ export default function CalendarGrid() {
           ) : (
             <div
               key={date}
-              className={`flex min-h-16 min-w-0 flex-col gap-1 rounded-lg border bg-gray-800 p-1.5 text-xs text-gray-300 lg:min-h-24 lg:p-2 lg:text-sm ${
+              onClick={(event) => isDoubleTap(`day-${date}`, event.timeStamp) && openAddModal({ date: dateString(date) })}
+              className={`touch-manipulation select-none flex min-h-16 min-w-0 flex-col gap-1 rounded-lg border bg-gray-800 p-1.5 text-xs text-gray-300 lg:min-h-24 lg:p-2 lg:text-sm ${
                 date === today.getDate() ? 'border-gray-400 text-white' : 'border-gray-700'
               }`}
             >
               {date}
               {eventsOf(date).slice(0, 2).map((row) => (
-                <span key={row.id} className="flex items-center gap-0.5 rounded bg-indigo-500/20 px-1 text-[10px] text-indigo-300 lg:text-xs">
+                <span
+                  key={row.id}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    if (isDoubleTap(`event-${row.id}`, event.timeStamp)) openScheduleView(row)
+                  }}
+                  className="flex cursor-pointer items-center gap-0.5 rounded bg-indigo-500/20 px-1 text-[10px] text-indigo-300 lg:text-xs"
+                >
                   <span className="min-w-0 flex-1 truncate">
                     {row.time && <span className="mr-1 text-indigo-200/70">{row.time.slice(0, 5)}</span>}
                     {row.title || '제목 없음'}
@@ -65,8 +78,11 @@ export default function CalendarGrid() {
                   <button
                     type="button"
                     aria-label={`${row.title || '제목 없음'} 삭제`}
-                    onClick={() => handleDelete(row.id)}
-                    className="shrink-0 rounded text-indigo-300/60 hover:text-red-400"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      handleDelete(row.id)
+                    }}
+                    className="hidden shrink-0 rounded text-indigo-300/60 hover:text-red-400 lg:block"
                   >
                     <X className="h-3 w-3" aria-hidden="true" />
                   </button>

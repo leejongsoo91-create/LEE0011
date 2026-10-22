@@ -6,32 +6,43 @@ import BottomTab from './BottomTab.jsx'
 import Header from './Header.jsx'
 import Fab from './Fab.jsx'
 import AddItemModal from './AddItemModal.jsx'
+import ScheduleViewModal from './ScheduleViewModal.jsx'
 import CommandPalette from './CommandPalette.jsx'
 import useTheme from '../hooks/useTheme.js'
 
 export default function Layout() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [prefill, setPrefill] = useState(null)
+  const [viewingSchedule, setViewingSchedule] = useState(null)
   const theme = useTheme()
 
-  // 카드를 누르면(edititem) 편집 모달, '+ 새로 만들기'를 누르면(additem) 추가 모달을 연다.
+  // 카드를 누르면(edititem) 편집 모달, '+ 새로 만들기'나 달력 빈 칸을 두 번 누르면(additem) 추가 모달,
+  // 달력의 일정을 두 번 누르면(viewschedule) 일정 보기 모달을 연다.
   useEffect(() => {
     const handleEdit = (event) => {
       setEditing(event.detail)
       setIsModalOpen(true)
     }
-    const handleAdd = () => setIsModalOpen(true)
+    const handleAdd = (event) => {
+      setPrefill(event.detail ?? null)
+      setIsModalOpen(true)
+    }
+    const handleView = (event) => setViewingSchedule(event.detail)
     window.addEventListener('edititem', handleEdit)
     window.addEventListener('additem', handleAdd)
+    window.addEventListener('viewschedule', handleView)
     return () => {
       window.removeEventListener('edititem', handleEdit)
       window.removeEventListener('additem', handleAdd)
+      window.removeEventListener('viewschedule', handleView)
     }
   }, [])
 
   const closeModal = () => {
     setIsModalOpen(false)
     setEditing(null)
+    setPrefill(null)
   }
 
   return (
@@ -47,7 +58,8 @@ export default function Layout() {
       </div>
       <BottomTab />
       <Fab onClick={() => setIsModalOpen(true)} />
-      {isModalOpen && <AddItemModal key={editing?.row.id ?? 'new'} editing={editing} onClose={closeModal} />}
+      {isModalOpen && <AddItemModal key={editing?.row.id ?? 'new'} editing={editing} prefill={prefill} onClose={closeModal} />}
+      {viewingSchedule && <ScheduleViewModal row={viewingSchedule} onClose={() => setViewingSchedule(null)} />}
     </>
   )
 }

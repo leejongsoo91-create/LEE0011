@@ -1,6 +1,6 @@
 # 결재 통제형 멀티 에이전트 시스템 — 아키텍처
 
-> 상태: **3단계 구현** (첫 실무 부서 '일정 부서' + AI 계획 작성기. 2단계 테스트 도구도 롤백 확인용으로 유지)
+> 상태: **뼈대 완료** (첫 실무 부서 '일정 부서' + AI 계획 작성기, 웹훅 시크릿 필수, 오류 알림. 2단계 테스트 도구는 롤백 확인용으로 유지)
 > 계획서: 「멀티 에이전트 뼈대 구축 계획서」 / 규칙서: `api/_agents/rules/global_rules.md`, `api/_agents/rules/dept_template.md`, `api/_agents/rules/dept_schedule.md`
 
 ## 1. 목표
@@ -54,7 +54,9 @@ PLANNING ──→ VALIDATING ──쓰기 있음──→ PENDING ──승인�
 - 만료는 별도 상태 없이 `FAILED`로 처리하고, `event_logs`에 `EXPIRED` 사유를 남긴다.
 - 크론은 쓰지 않는다. 봇에 메시지가 올 때마다 남은 작업(만료된 `PENDING`, 30분 넘은 `REJECTED`, 2분 넘게 멈춘 `EXECUTING`)을 정리한다.
 - 반려 사유는 봇이 보낸 `force_reply` 메시지에 단 답장으로 받는다. 그 메시지 번호를 `event_logs`의 `REASON_REQUESTED`에 적어 두어 세션 표 없이 작업을 찾는다.
-- `event_logs`의 사건 이름: `CREATED` `PLANNED` `VALIDATED` `VALIDATION_FAILED` `AUTO_APPROVED` `APPROVED` `REJECTED` `REASON_REQUESTED` `REPLANNING` `CANCELLED` `REJECT_LIMIT` `REASON_TIMEOUT` `EXPIRED` `HASH_MISMATCH` `SEND_FAILED` `EXECUTE_START` `STEP_START` `STEP_DONE` `STEP_FAILED` `UNDO_DONE` `UNDO_STEP_FAILED` `ROLLED_BACK` `UNDO_FAILED` `COMPLETED` `INTERRUPTED`
+- 오류는 서버 로그에만 두지 않고 텔레그램에 "원인 한 줄"로 알린다(`errors.js`). 키·토큰 같은 비밀 값은 넣지 않는다.
+- 쓰기 단계가 연결 끊김·5xx로 실패하면 저장됐는지 알 수 없으므로 원복 대상에 넣지 않고 `STEP_UNCERTAIN`으로 기록, 보고에 "⚠️ 확인 필요"를 붙인다.
+- `event_logs`의 사건 이름: `CREATED` `NEEDS_INFO` `PLAN_FAILED` `STEP_UNCERTAIN` `PLANNED` `VALIDATED` `VALIDATION_FAILED` `AUTO_APPROVED` `APPROVED` `REJECTED` `REASON_REQUESTED` `REPLANNING` `CANCELLED` `REJECT_LIMIT` `REASON_TIMEOUT` `EXPIRED` `HASH_MISMATCH` `SEND_FAILED` `EXECUTE_START` `STEP_START` `STEP_DONE` `STEP_FAILED` `UNDO_DONE` `UNDO_STEP_FAILED` `ROLLED_BACK` `UNDO_FAILED` `COMPLETED` `INTERRUPTED`
 - 상태 전환은 모두 "이 상태일 때만 바꾼다"는 조건부 업데이트로 한다. 버튼을 두 번 눌러도 한 번만 실행된다.
 
 ## 5. 역할
@@ -122,6 +124,7 @@ api/
     executor.js                  승인된 계획 실행 · 실패 시 역순 원복
     registry.js                  도구·부서 레지스트리 (일정 부서 2개 + 테스트 팀 3개)
     report.js                    텔레그램 문장 템플릿 (결재 요청·결과 보고·검증 실패·중단 알림)
+    errors.js                    오류 → 텔레그램에 보일 원인 한 줄 (비밀 값 제외)
     rules.js                     규칙서 로더 (vercel.json includeFiles로 배포에 포함)
     tasks.js / supabase.js       agent_tasks 읽기·조건부 전환·로그 추가
     telegram.js                  텔레그램 호출 (메시지 번호 반환, force_reply)
@@ -135,6 +138,7 @@ api/
 ## 10. 켜고 끄기
 
 환경변수 `AGENT_MODE=on`일 때만 에이전트 경로가 동작한다. 기본은 꺼짐이며, 꺼져 있으면 지금처럼 echo 응답만 한다.
+`AGENT_MODE=on`이면 `TELEGRAM_WEBHOOK_SECRET`이 **필수**다. setWebhook의 `secret_token`과 같은 값이어야 하고, 없으면 에이전트는 요청을 처리하지 않는다(위조 승인 방지).
 
 2단계 현재 `on` 상태의 동작(테스트 도구 모드): 지시 문구의 낱말로 가짜 계획을 고른다. 실제 데이터는 바뀌지 않는다.
 
@@ -158,6 +162,19 @@ api/
 
 테스트: `npm run test:agents` (가짜 Supabase·텔레그램, 외부 패키지 없음)
 
+## 10-1. 역할 배정표
+
+| 역할 | 파일 | 하는 일 | 할 수 없는 일 | AI |
+| --- | --- | --- | --- | --- |
+| 입구(접수) | `webhook.js`, `approval.js` | 텔레그램 수신, 시크릿·주인 확인, 새 지시·버튼·반려 사유 분배, 오류 알림 | 계획·실행 | 코드 |
+| 오케스트레이터 | `orchestrator.js` | 상태 전환, 계획→검증→결재/자동 승인 분기, 남은 작업 정리 | 도구 직접 실행 | 코드 |
+| 메인 에이전트(계획) | `planner.js` (테스트용 `plan.js`) | 규칙서에 맞는 JSON 계획, 모호하면 되묻기 | 실행, 위험도 결정 | **AI** |
+| 크로스체크(검증) | `validator.js` | 등록 도구·위험도·인자·원복·단계 수 검사 | 계획 수정 | 코드 |
+| 실무 에이전트(실행) | `executor.js` | 승인된 계획 실행, 역순 원복, 확인 필요 표시 | 계획에 없는 도구 호출 | 코드 |
+| 부서(도구·규칙) | `registry.js`, `tools/*.js`, `rules/dept_*.md` | 부서별 도구와 원복, 부서 규칙 | 다른 부서 데이터 | 코드 |
+| 보고 | `report.js`, `errors.js` | 결재 요청·결과·오류 문장 | 결과에 없는 내용 | 코드 |
+| 공용 기반 | `tasks.js`, `supabase.js`, `telegram.js`, `owner.js`, `rules.js` | 작업 기록, DB·텔레그램 호출, 주인 id, 규칙서 읽기 | — | 코드 |
+
 ## 11. 단계별 계획
 
 | 단계 | 작업 | 완료 기준 |
@@ -165,7 +182,8 @@ api/
 | 0 | 규칙서 3개 작성 | 문서 검토 완료 |
 | 1 | (1a) `agent_tasks` SQL — **Supabase 실행 완료** / (1b) 웹훅의 `callback_query` 수신과 `update_id` 중복 방지 — **배포·실제 확인 완료** | 가짜 입력으로 상태가 바뀌고 기존 echo는 그대로 |
 | 2 | 오케스트레이터 뼈대와 스위치 — **폰 확인 완료** | 모의 텔레그램으로 지시→계획→검증→결재→실행→보고 전 경로, 반려·만료·중복 경로 테스트 통과 |
-| 3 | 첫 부서(일정)·도구, 실제 LLM — **구현·자동 테스트 54개 통과, 배포 후 폰 확인 대기** | 자연어 지시 → AI 계획 → 결재 → 실제 일정 등록, 실패 시 삭제 원복 |
+| 3 | 첫 부서(일정)·도구, 실제 LLM — **폰 확인 완료** | 자연어 지시 → AI 계획 → 결재 → 실제 일정 등록, 실패 시 삭제 원복 |
+| 뼈대 마무리 | 웹훅 시크릿 필수, 오류 알림·원인 한 줄, 확인 필요 표시, 문서 정리 — **구현·자동 테스트 64개 통과** | 위조 요청 무시, 오류가 텔레그램에 보임 |
 | 4 | 일정 도래 시 자동 계획·결재 요청 (크론) | 별도 보고서·승인 |
 
 ## 12. 열린 항목

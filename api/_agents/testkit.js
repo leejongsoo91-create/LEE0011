@@ -3,6 +3,7 @@
 import { randomUUID } from 'node:crypto'
 
 export const OWNER = '42'
+export const TEST_SECRET = 'test-webhook-secret'
 export const OWNER_UID = '11111111-1111-4111-8111-111111111111'
 
 export function installFakes({ mode = 'on' } = {}) {
@@ -10,7 +11,7 @@ export function installFakes({ mode = 'on' } = {}) {
   process.env.TELEGRAM_CHAT_ID = OWNER
   process.env.SUPABASE_URL = 'https://mock.supabase.co'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key'
-  delete process.env.TELEGRAM_WEBHOOK_SECRET
+  process.env.TELEGRAM_WEBHOOK_SECRET = TEST_SECRET
   delete process.env.ANTHROPIC_API_KEY
   delete process.env.AGENT_PLANNER
   delete process.env.AGENT_USER_ID
@@ -99,7 +100,8 @@ export const click = (data, { chatId = 42, messageId = 77 } = {}) => ({
 })
 
 // 웹훅 핸들러를 직접 호출할 때 쓰는 가짜 요청·응답
-export async function callWebhook(handler, { method = 'POST', body, headers = {} } = {}) {
+// 기본으로 텔레그램처럼 시크릿 헤더를 붙인다. headers를 넘기면 그 값만 쓴다.
+export async function callWebhook(handler, { method = 'POST', body, headers = { 'x-telegram-bot-api-secret-token': TEST_SECRET } } = {}) {
   const result = { status: 0, body: null, headers: {} }
   const res = {
     setHeader: (key, value) => (result.headers[key] = value),

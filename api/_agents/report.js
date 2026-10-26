@@ -1,6 +1,7 @@
 // 텔레그램으로 보낼 문장 템플릿. (결재 요청·실행 결과·검증 실패·실행 중단)
 
 import { describePlan } from './plan.js'
+import { friendlyReason } from './errors.js'
 import { getTool } from './registry.js'
 
 const MAX_QUERY_SHOWN = 300
@@ -57,7 +58,11 @@ export function executionReport(task, outcome, rules) {
     outcome.results.forEach((r) => lines.push(`${r.step}. ${labelOf(r.tool)} — ${r.summary ?? '완료'}`))
   }
   if (outcome.failure) {
-    lines.push('', `실패한 단계: ${outcome.failure.step}. ${labelOf(outcome.failure.tool)} — ${outcome.failure.message}`)
+    lines.push('', `실패한 단계: ${outcome.failure.step}. ${labelOf(outcome.failure.tool)} — ${friendlyReason(outcome.failure)}`)
+    if (outcome.failure.uncertain) {
+      const what = outcome.failure.detail ? ` (${outcome.failure.detail})` : ''
+      lines.push(`⚠️ 확인 필요: ${outcome.failure.step}. ${labelOf(outcome.failure.tool)}${what} — 저장됐는지 알 수 없어요. 대시보드에서 확인해 주세요`)
+    }
   }
   if (outcome.undo?.length) {
     lines.push('', '되돌린 단계 (역순):')
@@ -71,6 +76,13 @@ export function executionReport(task, outcome, rules) {
   if (onlyTestTools(task.plan_payload)) lines.push(TEST_NOTE)
   return lines.join('\n')
 }
+
+export const errorText = (reason, { executing = false } = {}) =>
+  [
+    '⚠️ 처리 중 문제가 생겼어요',
+    `원인: ${reason}`,
+    ...(executing ? ['실행이 중간에 멈췄을 수 있어요. 2분 뒤 자동으로 정리되니, 대시보드에서 결과를 확인해 주세요.'] : []),
+  ].join('\n')
 
 export const clarificationText = (task, question) =>
   ['❓ 계획을 세우기 전에 확인이 필요해요', `지시: ${queryOf(task)}`, '', question, '', '내용을 보태서 지시를 다시 보내 주세요.'].join('\n')

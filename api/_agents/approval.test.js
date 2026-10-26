@@ -140,7 +140,7 @@ test('11. AGENT_MODE가 꺼져 있으면 기존 echo 응답 그대로, DB는 건
 
 test('12. 시크릿 헤더 검사와 POST 전용은 기존대로 동작한다', async () => {
   process.env.TELEGRAM_WEBHOOK_SECRET = 's3cret'
-  assert.equal((await callWebhook(handler, { body: message('x') })).status, 401)
+  assert.equal((await callWebhook(handler, { body: message('x'), headers: {} })).status, 401)
   assert.equal((await callWebhook(handler, { body: message('x'), headers: { 'x-telegram-bot-api-secret-token': 'bad' } })).status, 401)
   assert.equal(fake.tasks.length, 0)
   const ok = await callWebhook(handler, { body: message('x'), headers: { 'x-telegram-bot-api-secret-token': 's3cret' } })

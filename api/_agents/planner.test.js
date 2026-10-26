@@ -132,7 +132,7 @@ test('E. AI 호출 실패 → PLAN_FAILED 안내', async () => {
   useAi(new Error('overloaded'))
   assert.equal(await send('내일 회의'), 'plan-failed')
   assert.equal(lastTask().event_logs.at(-1).event, 'PLAN_FAILED')
-  assert.match(fake.sent.at(-1).text, /AI 호출 실패/)
+  assert.match(fake.sent.at(-1).text, /계획을 만들지 못했어요\n원인: AI 서버가 바빠요/)
 })
 
 test('F. AI가 등록을 읽기라고 적어도 결재를 거치고, 잘못된 인자·없는 도구는 검증에서 막힌다', async () => {

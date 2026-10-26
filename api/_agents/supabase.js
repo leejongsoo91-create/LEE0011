@@ -8,19 +8,32 @@ function config() {
   return { url: url.replace(/\/$/, ''), key }
 }
 
+// 쓰기 요청이 "서버에 닿았을 수도 있는" 방식으로 실패하면(연결 끊김·5xx) error.uncertain = true.
+// 실행기는 이런 단계를 원복 대상에서 빼는 대신 "확인 필요"로 보고한다.
+function failure(code, method, maybeApplied) {
+  const error = new Error(`supabase-${code}`)
+  error.uncertain = method !== 'GET' && maybeApplied
+  return error
+}
+
 export async function rest(path, { method = 'GET', body, prefer } = {}) {
   const { url, key } = config()
-  const response = await fetch(`${url}/rest/v1/${path}`, {
-    method,
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-      ...(prefer ? { Prefer: prefer } : {}),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
-  if (!response.ok) throw new Error(`supabase-${response.status}`)
+  let response
+  try {
+    response = await fetch(`${url}/rest/v1/${path}`, {
+      method,
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        ...(prefer ? { Prefer: prefer } : {}),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+  } catch {
+    throw failure('network', method, true)
+  }
+  if (!response.ok) throw failure(response.status, method, response.status >= 500)
   const text = await response.text()
   return text ? JSON.parse(text) : null
 }

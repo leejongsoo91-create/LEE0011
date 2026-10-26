@@ -44,7 +44,12 @@ export async function executePlan(task) {
       }
     } catch (error) {
       failure = { step: n, tool: step.tool, message: error?.message ?? String(error) }
-      await log({ event: 'STEP_FAILED', ...failure })
+      // 쓰기 요청이 서버에 닿았는지 알 수 없는 실패: 원복 대상에 넣지 않고(무엇을 지울지 모름) "확인 필요"로 보고
+      if (error?.uncertain && tool && tool.risk !== 'read') {
+        failure.uncertain = true
+        failure.detail = tool.describe && !tool.check?.(step.args) ? tool.describe(step.args) : null
+      }
+      await log({ event: failure.uncertain ? 'STEP_UNCERTAIN' : 'STEP_FAILED', ...failure })
       break
     }
   }

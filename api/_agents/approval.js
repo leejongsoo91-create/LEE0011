@@ -10,7 +10,8 @@ import {
   sweepStale,
 } from './orchestrator.js'
 import { hashPlan } from './plan.js'
-import { REASON_PROMPT, approvalText } from './report.js'
+import { friendlyReason } from './errors.js'
+import { REASON_PROMPT, approvalText, errorText } from './report.js'
 import { answerCallbackQuery, editMessageText, forceReply, sendMessage } from './telegram.js'
 import { appendLog, findAwaitingReason, getTask, isTaskId, transition } from './tasks.js'
 
@@ -21,6 +22,17 @@ const isOwner = (chatId) => {
   return Boolean(owner) && chatId != null && String(chatId) === String(owner)
 }
 
+// 주인 확인이 끝난 뒤의 처리에서 예상 못 한 오류가 나면, 서버 로그에만 남기지 않고 텔레그램으로도 알린다.
+async function guard(chatId, work, { executing = false } = {}) {
+  try {
+    return await work()
+  } catch (error) {
+    console.error('[agents] 처리 중 오류', error)
+    await sendMessage(chatId, errorText(friendlyReason(error), { executing }))
+    return 'error'
+  }
+}
+
 // 일반 메시지: (1) 남은 작업 정리 (2) 반려 사유 답장이면 재계획 (3) 아니면 새 지시
 async function handleMessage(update) {
   const message = update.message
@@ -28,6 +40,11 @@ async function handleMessage(update) {
   if (!text) return 'no-text'
   const chatId = message.chat?.id
   if (!isOwner(chatId)) return 'not-owner'
+  return guard(chatId, () => routeMessage(update, text, chatId))
+}
+
+async function routeMessage(update, text, chatId) {
+  const message = update.message
 
   try {
     await sweepStale(chatId)
@@ -66,7 +83,10 @@ async function handleReason(task, text, chatId) {
 async function handleCallback(callback) {
   const chatId = callback.message?.chat?.id ?? callback.from?.id
   if (!isOwner(chatId)) return 'not-owner'
+  return guard(chatId, () => routeCallback(callback, chatId))
+}
 
+async function routeCallback(callback, chatId) {
   const messageId = callback.message?.message_id
   const [action, id] = String(callback.data ?? '').split(':')
   const reply = (text) => answerCallbackQuery(callback.id, text)
@@ -135,8 +155,8 @@ async function handleCallback(callback) {
   if (approve) {
     await reply('승인했어요. 실행합니다')
     await close(`✅ 승인됨 — 실행 결과는 아래 메시지로 보내요\n지시: ${task.task_query}`)
-    await runApproved(updated, chatId)
-    return 'approved'
+    const ran = await guard(chatId, () => runApproved(updated, chatId), { executing: true })
+    return ran === 'error' ? 'error' : 'approved'
   }
 
   // 반려: 한도를 넘으면 종료, 아니면 사유를 답장으로 받는다.

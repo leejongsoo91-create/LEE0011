@@ -5,6 +5,7 @@
 //                                       │ 읽기만 → APPROVED(AUTO_APPROVED) → 실행
 //                                       └ 쓰기 있음 → PENDING → (결재 버튼: approval.js)
 
+import { friendlyReason } from './errors.js'
 import { executePlan } from './executor.js'
 import { hashPlan } from './plan.js'
 import { choosePlanner } from './planner.js'
@@ -26,7 +27,7 @@ export async function startInstruction({ text, chatId, updateId }, options) {
     task = await createTask({ query: text, sourceUpdateId: updateId, status: 'PLANNING', log: { event: 'CREATED' } })
   } catch (error) {
     console.error('[agents] 작업 생성 실패', error)
-    await sendMessage(chatId, '⚠️ 작업을 저장하지 못했어요. 잠시 뒤에 다시 보내 주세요.')
+    await sendMessage(chatId, `⚠️ 작업을 저장하지 못했어요. 잠시 뒤에 다시 보내 주세요.\n원인: ${friendlyReason(error)}`)
     return 'error'
   }
   if (!task) return 'duplicate'
@@ -48,7 +49,7 @@ export async function planAndRoute(task, chatId, { planner = choosePlanner() } =
   } catch (error) {
     console.error('[agents] 계획 작성 실패', error)
     await transition(task, 'FAILED', { log: { event: 'PLAN_FAILED', note: String(error?.message ?? error).slice(0, 300) } })
-    await sendMessage(chatId, `🚫 계획을 만들지 못했어요 (AI 호출 실패). 잠시 뒤에 다시 보내 주세요.\n지시: ${task.task_query}`)
+    await sendMessage(chatId, `🚫 계획을 만들지 못했어요\n원인: ${friendlyReason(error)}\n지시: ${task.task_query}`)
     return 'plan-failed'
   }
 

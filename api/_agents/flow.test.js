@@ -24,7 +24,7 @@ test('1. "조회" 지시 → 결재 버튼 없이 바로 실행, COMPLETED 보�
   const task = lastTask()
   assert.equal(task.status, 'COMPLETED')
   assert.deepEqual(events(task), ['CREATED', 'PLANNED', 'AUTO_APPROVED', 'EXECUTE_START', 'STEP_START', 'STEP_DONE', 'COMPLETED'])
-  assert.deepEqual(task.event_logs[1].rules, { global: true, deptTemplate: true, schedule: true })
+  assert.deepEqual(task.event_logs[1].rules, { global: true, deptTemplate: true, depts: { schedule: true } })
   assert.equal(fake.sent.length, 1)
   assert.equal(fake.sent[0].reply_markup, undefined, '결재 버튼이 없어야 한다')
   assert.match(fake.sent[0].text, /✅ 완료[\s\S]*결재 없이 실행[\s\S]*규칙서: 전사 공통 ✓ · 일정 부서 ✓/)

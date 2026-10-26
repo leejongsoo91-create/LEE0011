@@ -32,9 +32,9 @@ export function scenarioOf(text) {
   return null
 }
 
-const step = (tool, args) => ({ tool, args, risk: getTool(tool).risk })
+const step = (tool, args) => ({ tool, args, risk: getTool(tool).risk, dept: getTool(tool).dept })
 
-export function buildTestPlan(query, { feedback } = {}) {
+export function buildTestPlan(query, { feedback, review, round = 0 } = {}) {
   // 반려 사유에 시나리오 낱말이 있으면 그걸 따르고, 없으면 원래 지시를 따른다.
   const scenario = scenarioOf(feedback) ?? scenarioOf(query) ?? 'write'
   const text = query
@@ -44,7 +44,16 @@ export function buildTestPlan(query, { feedback } = {}) {
     fail: [step('test.write', { text }), step('test.fail_write', { text })],
     'undo-fail': [step('test.write', { text, failUndo: true }), step('test.fail_write', { text })],
   }[scenario]
-  return { version: 2, testMode: true, scenario, steps, ...(feedback ? { feedback } : {}) }
+  return {
+    version: 2,
+    testMode: true,
+    main: { program: 'test' },
+    scenario,
+    revision: round,
+    summary: review ? `크로스체크 의견 반영 (${round}회): ${review.comments.join(' / ')}` : '',
+    steps,
+    ...(feedback ? { feedback } : {}),
+  }
 }
 
 export const RISK_LABEL = { read: '읽기', write: '쓰기·원복 가능', irreversible: '⚠️ 되돌릴 수 없음' }

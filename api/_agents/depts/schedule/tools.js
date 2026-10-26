@@ -1,8 +1,8 @@
 // 일정 부서 도구: schedule.list(read), schedule.create(write, 원복 = 등록한 행 삭제)
-// 규칙서: rules/dept_schedule.md. 모든 쿼리에 주인 user_id 조건을 코드가 강제로 붙인다.
+// 규칙서: depts/schedule/rules.md. 모든 쿼리에 주인 user_id 조건을 코드가 강제로 붙인다.
 
-import { ownerUserId } from '../owner.js'
-import { rest } from '../supabase.js'
+import { ownerUserId } from '../../owner.js'
+import { rest } from '../../supabase.js'
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/
@@ -26,7 +26,6 @@ export const dayLabel = (date) => {
 const remindLabel = (min) => (min == null ? '알림 없음' : min === 0 ? '정시 알림' : min === 60 ? '1시간 전 알림' : `${min}분 전 알림`)
 
 export const scheduleCreate = {
-  dept: 'schedule',
   label: '일정 등록',
   risk: 'write',
   description: '일정 1건을 등록한다.',
@@ -85,7 +84,6 @@ export const scheduleCreate = {
 }
 
 export const scheduleList = {
-  dept: 'schedule',
   label: '일정 조회',
   risk: 'read',
   description: '기간 안의 내 일정을 날짜·시간 순으로 최대 50건 조회한다.',

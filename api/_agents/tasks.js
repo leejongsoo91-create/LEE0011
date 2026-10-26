@@ -43,13 +43,13 @@ export async function transition(task, to, { log, patch = {} } = {}) {
   return rows?.[0] ?? null
 }
 
-// 상태는 그대로 두고 로그만 덧붙인다. 그 사이 상태가 바뀌었으면 null (예: 실행 중 작업이 '중단'으로 정리됨).
-export async function appendLog(task, entries) {
+// 상태는 그대로 두고 로그만 덧붙인다(patch로 다른 칸도 함께 바꿀 수 있다). 그 사이 상태가 바뀌었으면 null.
+export async function appendLog(task, entries, { patch = {} } = {}) {
   const list = (Array.isArray(entries) ? entries : [entries]).map((entry) => ({ at: new Date().toISOString(), ...entry }))
   const rows = await rest(`${TABLE}?id=eq.${task.id}&status=eq.${task.status}`, {
     method: 'PATCH',
     prefer: 'return=representation',
-    body: { event_logs: [...(task.event_logs ?? []), ...list] },
+    body: { ...patch, event_logs: [...(task.event_logs ?? []), ...list] },
   })
   return rows?.[0] ?? null
 }

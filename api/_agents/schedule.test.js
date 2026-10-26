@@ -1,7 +1,7 @@
 import test, { beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { resetOwnerCache, ownerUserId } from './owner.js'
-import { scheduleCreate, scheduleList } from './tools/schedule.js'
+import { scheduleCreate, scheduleList } from './depts/schedule/tools.js'
 import { OWNER_UID, installFakes } from './testkit.js'
 
 let fake

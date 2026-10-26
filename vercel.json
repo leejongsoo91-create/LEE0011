@@ -18,7 +18,7 @@
   ],
   "functions": {
     "api/webhook.js": {
-      "includeFiles": "api/_agents/rules/**",
+      "includeFiles": "api/_agents/**/*.md",
       "maxDuration": 60
     }
   }

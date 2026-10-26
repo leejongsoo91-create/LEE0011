@@ -50,7 +50,8 @@ test('submit_plan 도구(auto), 위험도는 AI가 아니라 레지스트리 값
   assert.equal(params.model, 'claude-sonnet-5-5')
   assert.deepEqual(params.tools[0].input_schema.properties.steps.items.properties.tool.enum, ['schedule.list', 'schedule.create', 'test.fail_write'])
   assert.deepEqual(plan.steps.map((s) => s.risk), ['write', 'unknown'])
-  assert.equal(plan.planner, 'ai')
+  assert.deepEqual(plan.main, { program: 'anthropic', model: 'claude-sonnet-5-5' })
+  assert.deepEqual(plan.steps.map((s) => s.dept), ['schedule', 'unknown'])
 })
 
 test('AGENT_MODEL로 모델을 바꿀 수 있고, 반려 사유와 이전 계획이 AI에게 전달된다', async () => {
@@ -78,7 +79,7 @@ test('A. "내일 오후 3시 회의 등록" → 결재 요청(일정 내용·AI�
   const approval = fake.sent.at(-1).text
   assert.match(approval, /요약: 내일 오후 3시 → 10\/28\(수\) 15:00/)
   assert.match(approval, /1\. 일정 등록: 10\/28\(수\) 15:00 · "회의" · 정시 알림 \[쓰기·원복 가능\]/)
-  assert.match(approval, /🤖 계획: AI \(claude-sonnet-5-5\)/)
+  assert.match(approval, /👥 맡는 부서: 일정 부서\n🤖 메인: Anthropic \(claude-sonnet-5-5\)\n🔍 크로스체크: 코드 검사만/)
   assert.match(approval, /⚠️ 실제 대시보드 데이터가 바뀝니다/)
   assert.equal(fake.schedule.length, 0, '승인 전에는 등록되지 않는다')
 
@@ -109,7 +110,7 @@ test('C. "이번 주 일정" → 조회는 결재 없이 바로 실행, 내 일�
   assert.equal(await send('이번 주 일정 알려 줘'), 'completed')
   const report = fake.sent.at(-1).text
   assert.equal(fake.sent.at(-1).reply_markup, undefined)
-  assert.match(report, /결재 없이 실행[\s\S]*🤖 계획: AI[\s\S]*일정 1건\n  · 10\/28\(수\) 15:00 회의/)
+  assert.match(report, /결재 없이 실행[\s\S]*🤖 메인: Anthropic[\s\S]*일정 1건\n  · 10\/28\(수\) 15:00 회의/)
   assert.doesNotMatch(report, /남의 일정/)
 })
 
@@ -170,4 +171,21 @@ test('H. 일정 저장 자체가 실패 → 되돌릴 것 없이 FAILED 보고',
   await handleUpdate(click(`a:${lastTask().id}`))
   assert.equal(lastTask().status, 'FAILED')
   assert.match(fake.sent.at(-1).text, /실패한 단계: 1\. 일정 등록[\s\S]*되돌릴 단계 없음/)
+})
+
+test('상의: 크로스체크 의견과 방금 낸 계획이 AI에게 전달되고, 고친 횟수가 revision에 남는다', async () => {
+  const client = fakeAnthropic({ summary: '의견 반영: 제목 구체화', steps: [createStep({ title: '팀 주간 회의' })] })
+  const plan = await aiPlan('내일 3시 회의', {
+    client,
+    round: 1,
+    previousPlan: { summary: '처음', steps: [createStep()] },
+    review: { verdict: 'object', comments: ['제목이 너무 짧아요'] },
+    timeoutMs: 12000,
+  })
+  const content = client.calls[0].messages[0].content
+  assert.match(content, /내가 방금 낸 계획: .*"title":"회의"/)
+  assert.match(content, /크로스체크 에이전트의 의견: 제목이 너무 짧아요/)
+  assert.doesNotMatch(content, /반려 사유/)
+  assert.equal(plan.revision, 1)
+  assert.match(buildSystemPrompt(loadRules()), /크로스체크 에이전트의 의견이 주어지면/)
 })

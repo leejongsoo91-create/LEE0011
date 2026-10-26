@@ -13,11 +13,11 @@ export async function executePlan(task) {
 
   // 승인(또는 자동 승인) 뒤에 계획이 바뀌지 않았는지 실행 직전에 한 번 더 확인한다.
   if (hashPlan(task.plan_payload) !== task.plan_hash) {
-    const failed = await transition(task, 'FAILED', { log: { event: 'HASH_MISMATCH', note: '실행 직전 계획 확인 실패' } })
+    const failed = await transition(task, 'FAILED', { log: { agent: 'executor', event: 'HASH_MISMATCH', note: '실행 직전 계획 확인 실패' } })
     return { status: 'hash-mismatch', task: failed ?? task }
   }
 
-  let current = await transition(task, 'EXECUTING', { log: { event: 'EXECUTE_START' } })
+  let current = await transition(task, 'EXECUTING', { log: { agent: 'executor', event: 'EXECUTE_START' } })
   if (!current) return { status: 'already', task }
 
   const steps = task.plan_payload.steps
@@ -26,7 +26,12 @@ export async function executePlan(task) {
 
   // 로그를 붙이다가 상태가 바뀐 것을 발견하면(다른 요청이 '중단'으로 정리함) 즉시 멈춘다.
   const log = async (entries) => {
-    const next = await appendLog(current, entries)
+    const list = (Array.isArray(entries) ? entries : [entries]).map((entry) => ({
+      agent: 'executor',
+      ...(entry.tool ? { dept: getTool(entry.tool)?.dept ?? 'unknown' } : {}),
+      ...entry,
+    }))
+    const next = await appendLog(current, list)
     if (next) current = next
     return Boolean(next)
   }
@@ -57,7 +62,7 @@ export async function executePlan(task) {
   const results = done.map(({ n, step, output }) => ({ step: n, tool: step.tool, summary: output?.summary }))
 
   if (!failure) {
-    const completed = await transition(current, 'COMPLETED', { log: { event: 'COMPLETED' } })
+    const completed = await transition(current, 'COMPLETED', { log: { agent: 'executor', event: 'COMPLETED' } })
     return { status: 'completed', task: completed ?? current, results }
   }
 
@@ -76,7 +81,7 @@ export async function executePlan(task) {
   if (undo.length) await log(undo.map((item) => ({ event: item.ok ? 'UNDO_DONE' : 'UNDO_STEP_FAILED', ...item })))
 
   const failed = await transition(current, 'FAILED', {
-    log: { event: undoFailed ? 'UNDO_FAILED' : 'ROLLED_BACK', failedStep: failure.step, reason: failure.message },
+    log: { agent: 'executor', event: undoFailed ? 'UNDO_FAILED' : 'ROLLED_BACK', failedStep: failure.step, reason: failure.message },
   })
   return { status: undoFailed ? 'undo-failed' : 'rolled-back', task: failed ?? current, results, failure, undo }
 }

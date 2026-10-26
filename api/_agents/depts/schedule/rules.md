@@ -1,6 +1,6 @@
 # 일정 부서 규칙 (Micro Rulebook)
 
-`dept_template.md`를 바탕으로 만든 첫 실무 부서의 규칙서다.
+`rules/dept_template.md`를 바탕으로 만든 첫 실무 부서의 규칙서다. (위치: `depts/schedule/rules.md`)
 전사 공통 규칙(`global_rules.md`)이 먼저 적용되고, 이 문서는 일정 부서만의 제한을 **더하기만** 한다.
 메인 에이전트(계획 담당 AI)는 이 문서를 시스템 프롬프트로 받아 계획을 세운다.
 
@@ -71,5 +71,5 @@
 - [x] `write` 도구마다 되돌리는 방법이 정의되어 있다
 - [x] 접근 허용 구역이 최소한으로 좁혀져 있다 (`schedule` 테이블, 내 `user_id`)
 - [x] 필수 파라미터와 되물을 말이 도구마다 적혀 있다
-- [x] 레지스트리에 부서와 도구를 등록했다 (`registry.js`, `tools/schedule.js`)
+- [x] 부서 폴더(`depts/schedule/`: `index.js`, `tools.js`, `rules.md`)를 만들고 `depts/index.js`에 등록했다
 - [x] 모의 지시로 계획 → 검증 → 결재 → 실행 → 원복 경로를 테스트했다 (`schedule.test.js`, `planner.test.js`)

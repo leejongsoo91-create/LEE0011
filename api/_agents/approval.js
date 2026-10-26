@@ -69,12 +69,12 @@ async function routeMessage(update, text, chatId) {
 // 반려 사유 답장 → "취소"면 종료, 아니면 사유를 feedback에 담아 PLANNING으로 되돌려 재계획
 async function handleReason(task, text, chatId) {
   if (text === '취소') {
-    const cancelled = await transition(task, 'FAILED', { log: { event: 'CANCELLED', note: '반려 후 취소' } })
+    const cancelled = await transition(task, 'FAILED', { log: { agent: 'captain', event: 'CANCELLED', note: '반려 후 취소' } })
     if (!cancelled) return 'already'
     await sendMessage(chatId, `🛑 작업을 취소했어요.\n지시: ${task.task_query}`)
     return 'cancelled'
   }
-  const planning = await transition(task, 'PLANNING', { log: { event: 'REPLANNING', feedback: text }, patch: { feedback: text } })
+  const planning = await transition(task, 'PLANNING', { log: { agent: 'captain', event: 'REPLANNING', feedback: text }, patch: { feedback: text } })
   if (!planning) return 'already'
   return planAndRoute(planning, chatId)
 }
@@ -119,7 +119,7 @@ async function routeCallback(callback, chatId) {
 
   // 검사 2: 만료 전인가
   if (new Date(task.expires_at).getTime() <= Date.now()) {
-    await transition(task, 'FAILED', { log: { event: 'EXPIRED', note: '결재 대기 시간(30분) 초과' } }).catch(() => null)
+    await transition(task, 'FAILED', { log: { agent: 'intake', event: 'EXPIRED', note: '결재 대기 시간(30분) 초과' } }).catch(() => null)
     await reply('만료된 결재예요')
     await close(`⏰ 만료됨: 30분 안에 결정하지 않아 취소되었습니다.\n지시: ${task.task_query}`)
     return 'expired'
@@ -127,7 +127,7 @@ async function routeCallback(callback, chatId) {
 
   // 검사 3: 결재 요청 때의 계획과 지금 저장된 계획이 같은가
   if (hashPlan(task.plan_payload) !== task.plan_hash) {
-    await transition(task, 'FAILED', { log: { event: 'HASH_MISMATCH', note: '계획이 승인 요청 이후 바뀜' } }).catch(() => null)
+    await transition(task, 'FAILED', { log: { agent: 'intake', event: 'HASH_MISMATCH', note: '계획이 승인 요청 이후 바뀜' } }).catch(() => null)
     await reply('계획이 바뀌어 거부했어요')
     await close('🚫 승인이 거부되었습니다: 결재 요청 이후 계획 내용이 바뀌었습니다.')
     return 'hash-mismatch'
@@ -139,7 +139,7 @@ async function routeCallback(callback, chatId) {
   let updated
   try {
     updated = await transition(task, approve ? 'APPROVED' : 'REJECTED', {
-      log: approve ? { event: 'APPROVED' } : { event: 'REJECTED', count: rejectCount },
+      log: approve ? { agent: 'captain', event: 'APPROVED' } : { agent: 'captain', event: 'REJECTED', count: rejectCount },
       patch: approve ? {} : { reject_count: rejectCount },
     })
   } catch (error) {
@@ -161,7 +161,7 @@ async function routeCallback(callback, chatId) {
 
   // 반려: 한도를 넘으면 종료, 아니면 사유를 답장으로 받는다.
   if (rejectCount > MAX_REJECTS) {
-    await transition(updated, 'FAILED', { log: { event: 'REJECT_LIMIT', note: `반려 ${rejectCount}회` } })
+    await transition(updated, 'FAILED', { log: { agent: 'intake', event: 'REJECT_LIMIT', note: `반려 ${rejectCount}회` } })
     await reply('반려 한도를 넘어 작업을 끝냈어요')
     await close(`❌ 반려 ${rejectCount}회째라 작업을 끝냈어요\n지시: ${task.task_query}`)
     return 'reject-limit'
@@ -170,7 +170,7 @@ async function routeCallback(callback, chatId) {
   await close(`❌ 반려됨 (${rejectCount}/${MAX_REJECTS}회)\n지시: ${task.task_query}`)
   const prompt = await sendMessage(chatId, REASON_PROMPT, forceReply('반려 사유 (또는 취소)'))
   if (prompt.messageId != null) {
-    await appendLog(updated, { event: 'REASON_REQUESTED', prompt_message_id: prompt.messageId }).catch(() => null)
+    await appendLog(updated, { agent: 'intake', event: 'REASON_REQUESTED', prompt_message_id: prompt.messageId }).catch(() => null)
   }
   return 'rejected'
 }

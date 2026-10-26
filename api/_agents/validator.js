@@ -20,6 +20,7 @@ export function validatePlan(plan, registry = tools) {
     if (!tool) return errors.push(`${n}단계: 등록되지 않은 도구 "${step?.tool}"`)
     if (!RISKS.has(tool.risk)) errors.push(`${n}단계: 도구 위험도가 잘못 등록됨`)
     if (step.risk !== tool.risk) errors.push(`${n}단계: 위험도 표기(${step.risk})가 도구(${tool.risk})와 다릅니다`)
+    if (step.dept !== undefined && step.dept !== tool.dept) errors.push(`${n}단계: 부서 표기(${step.dept})가 도구의 부서(${tool.dept})와 다릅니다`)
     const argError = tool.check?.(step.args) ?? null
     if (argError) errors.push(`${n}단계: ${argError}`)
     if (tool.risk === 'write' && typeof tool.undo !== 'function') errors.push(`${n}단계: 원복 방법이 없는 쓰기 도구`)

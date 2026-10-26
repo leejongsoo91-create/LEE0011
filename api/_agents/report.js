@@ -2,7 +2,7 @@
 
 import { describePlan } from './plan.js'
 import { friendlyReason } from './errors.js'
-import { getTool } from './registry.js'
+import { deptName, getTool } from './registry.js'
 
 const MAX_QUERY_SHOWN = 300
 const TEST_NOTE = '🧪 테스트 도구만 쓰는 계획이라 실제 데이터는 바뀌지 않습니다.'
@@ -10,8 +10,31 @@ const REAL_NOTE = '⚠️ 실제 대시보드 데이터가 바뀝니다. (실패
 
 // 계획이 실제 데이터를 건드리는지(테스트 팀 도구만 있는지)
 const onlyTestTools = (plan) => (plan?.steps ?? []).every((step) => getTool(step.tool)?.dept === 'test')
+// 누가 계획했는지 (메인 에이전트 프로그램)
 const plannerLine = (plan) =>
-  plan?.planner === 'ai' ? `🤖 계획: AI (${plan.model})` : '🧪 계획: 테스트 계획 작성기 (AI 아님)'
+  plan?.main?.program === 'anthropic'
+    ? `🤖 메인: Anthropic (${plan.main.model})`
+    : plan?.main?.program === 'test' || plan?.testMode
+      ? '🧪 메인: 테스트 계획 작성기 (AI 아님)'
+      : `🤖 메인: ${plan?.main?.program ?? '알 수 없음'}`
+
+// 크로스체크와의 상의 결과
+function crosscheckLine(plan) {
+  const review = plan?.review
+  if (!review || review.verdict === 'off') return '🔍 크로스체크: 코드 검사만 (크로스체크 에이전트 꺼짐)'
+  const rounds = review.rounds > 0 ? `상의 ${review.rounds}회` : '바로'
+  const comments = review.comments?.length ? `: ${review.comments.join(' / ')}` : ''
+  if (review.verdict === 'agreed') return `🔍 크로스체크: 동의 (${rounds})`
+  if (review.verdict === 'unresolved') return `⚠️ 크로스체크 이견 (상의 ${review.rounds}회 후에도)${comments}`
+  if (review.verdict === 'timeout') return `⏱️ 시간 부족으로 상의 중단 (상의 ${review.rounds}회)${comments}`
+  return `⚠️ 크로스체크 에이전트 오류${comments}`
+}
+
+// 맡는 부서
+const deptsLine = (plan) => {
+  const ids = [...new Set((plan?.steps ?? []).map((step) => getTool(step.tool)?.dept).filter(Boolean))]
+  return ids.length ? `👥 맡는 부서: ${ids.map(deptName).join(', ')}` : null
+}
 
 const queryOf = (task) =>
   task.task_query.length > MAX_QUERY_SHOWN ? `${task.task_query.slice(0, MAX_QUERY_SHOWN)}…` : task.task_query
@@ -21,14 +44,21 @@ const labelOf = (tool) => getTool(tool)?.label ?? tool
 export const kst = (iso) =>
   new Date(iso).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false })
 
+const mark = (ok) => (ok ? '✓' : '✗')
 const rulesLine = (status) =>
-  `📚 규칙서: 전사 공통 ${status?.global ? '✓' : '✗'} · 일정 부서 ${status?.schedule ? '✓' : '✗'} · 부서 템플릿 ${status?.deptTemplate ? '✓' : '✗'}`
+  [
+    `📚 규칙서: 전사 공통 ${mark(status?.global)}`,
+    ...Object.entries(status?.depts ?? {}).map(([id, ok]) => `${deptName(id)} ${mark(ok)}`),
+    `부서 템플릿 ${mark(status?.deptTemplate)}`,
+  ].join(' · ')
 
 export function approvalText(task, rules) {
   const lines = ['📝 [결재 요청]', `지시: ${queryOf(task)}`]
   if (task.reject_count > 0) lines.push(`🔁 재계획 ${task.reject_count}회차 · 반려 사유: ${task.feedback ?? '(없음)'}`)
   if (task.plan_payload?.summary) lines.push(`요약: ${task.plan_payload.summary}`)
-  lines.push('', '계획:', describePlan(task.plan_payload), '', plannerLine(task.plan_payload), rulesLine(rules))
+  lines.push('', '계획:', describePlan(task.plan_payload), '')
+  lines.push(...[deptsLine(task.plan_payload), plannerLine(task.plan_payload), crosscheckLine(task.plan_payload)].filter(Boolean))
+  if (rules) lines.push(rulesLine(rules))
   lines.push(`⏰ ${kst(task.expires_at)}까지 결정해 주세요 (30분 뒤 만료)`)
   lines.push(onlyTestTools(task.plan_payload) ? TEST_NOTE : REAL_NOTE)
   return lines.join('\n')
@@ -51,7 +81,8 @@ export function executionReport(task, outcome, rules) {
   const lines = [HEAD[outcome.status] ?? `결과: ${outcome.status}`, `지시: ${queryOf(task)}`]
   if ((task.event_logs ?? []).some((entry) => entry.event === 'AUTO_APPROVED')) {
     lines.push('(읽기 전용 계획이라 결재 없이 실행했어요)')
-    if (rules) lines.push(plannerLine(task.plan_payload), rulesLine(rules))
+    lines.push(...[deptsLine(task.plan_payload), plannerLine(task.plan_payload), crosscheckLine(task.plan_payload)].filter(Boolean))
+    if (rules) lines.push(rulesLine(rules))
   }
   if (outcome.results?.length) {
     lines.push('', '실행한 단계:')

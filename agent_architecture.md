@@ -116,7 +116,7 @@ api/
   _agents/
     approval.js                  텔레그램 입구: 새 지시 · [승인]/[반려] 버튼 · 반려 사유 답장
     orchestrator.js              PLANNING→VALIDATING→PENDING/자동 승인, 남은 작업 정리
-    planner.js                   메인 에이전트: Anthropic API + 규칙서 → submit_plan 강제 호출로 JSON 계획 (되묻기 포함)
+    planner.js                   메인 에이전트: Anthropic API + 규칙서 → submit_plan 도구(tool_choice auto)로 JSON 계획 (되묻기 포함)
     plan.js                      계획 해시 · 테스트 계획 작성기(낱말 시나리오) · 결재 요약
     owner.js                     대시보드 주인 user_id (AGENT_USER_ID 또는 Auth 사용자 1명 자동)
     tools/schedule.js            일정 부서 도구: schedule.list(read), schedule.create(write, 원복=삭제)

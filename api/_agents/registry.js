@@ -4,11 +4,16 @@
 // 도구 하나 = { dept, label, risk, check(args) → 오류 문장|null, run(args) → 결과, undo(args, 결과) → 결과 }
 //   risk: 'read'(결재 없이 실행) · 'write'(결재 필요, undo 필수) · 'irreversible'(결재 + 경고, 계획의 마지막 1단계만)
 //
-// 2단계에서는 실제 부서 없이 "테스트 팀" 도구 3개만 있다. 실제 데이터는 건드리지 않는다.
+//   선택: describe(args) → 결재 요약 한 줄 · description·schema → AI 계획 작성기에 보여 줄 설명과 인자 형식
+//   aiVisible: false면 AI 계획 작성기에는 보이지 않는다 (테스트 계획 작성기 전용)
+//
+// 부서: 일정 부서(3단계, 실제 데이터) + 테스트 팀(2단계, 가짜 도구)
 
 import { randomUUID } from 'node:crypto'
+import { scheduleCreate, scheduleList } from './tools/schedule.js'
 
 export const departments = {
+  schedule: { name: '일정 부서', rules: 'dept_schedule.md', tools: ['schedule.list', 'schedule.create'] },
   test: { name: '테스트 팀', tools: ['test.lookup', 'test.write', 'test.fail_write'] },
 }
 
@@ -28,9 +33,12 @@ function checkTextArgs(args) {
 const short = (text) => (text.length > 30 ? `${text.slice(0, 30)}…` : text)
 
 export const tools = {
+  'schedule.list': scheduleList,
+  'schedule.create': scheduleCreate,
   'test.lookup': {
     dept: 'test',
     label: '테스트 조회',
+    aiVisible: false,
     risk: 'read',
     check: checkTextArgs,
     run: async (args) => ({ summary: `가짜 데이터 3건 조회 ("${short(args.text)}")` }),
@@ -38,6 +46,7 @@ export const tools = {
   'test.write': {
     dept: 'test',
     label: '테스트 쓰기',
+    aiVisible: false,
     risk: 'write',
     check: checkTextArgs,
     run: async (args) => {
@@ -55,6 +64,12 @@ export const tools = {
     dept: 'test',
     label: '실패하는 테스트 쓰기',
     risk: 'write',
+    description: '롤백 확인용. 항상 실패한다. 캡틴이 "실패 테스트"·"롤백 테스트"를 명시적으로 요청할 때만 계획의 마지막 단계에 넣는다.',
+    schema: {
+      type: 'object',
+      properties: { text: { type: 'string', description: '아무 설명 (1~500자)' } },
+      required: ['text'],
+    },
     check: checkTextArgs,
     run: async () => {
       throw new Error('의도된 실패(테스트)')

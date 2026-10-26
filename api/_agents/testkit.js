@@ -3,6 +3,7 @@
 import { randomUUID } from 'node:crypto'
 
 export const OWNER = '42'
+export const OWNER_UID = '11111111-1111-4111-8111-111111111111'
 
 export function installFakes({ mode = 'on' } = {}) {
   process.env.TELEGRAM_BOT_TOKEN = 'TOKEN'
@@ -10,10 +11,14 @@ export function installFakes({ mode = 'on' } = {}) {
   process.env.SUPABASE_URL = 'https://mock.supabase.co'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key'
   delete process.env.TELEGRAM_WEBHOOK_SECRET
+  delete process.env.ANTHROPIC_API_KEY
+  delete process.env.AGENT_PLANNER
+  delete process.env.AGENT_USER_ID
   if (mode) process.env.AGENT_MODE = mode
   else delete process.env.AGENT_MODE
 
-  const fake = { tasks: [], sent: [], edits: [], answers: [], dbCalls: 0, failDb: false, failTelegram: false }
+  const tables = { agent_tasks: [], schedule: [] }
+  const fake = { tables, tasks: tables.agent_tasks, schedule: tables.schedule, users: [{ id: OWNER_UID }], sent: [], edits: [], answers: [], dbCalls: 0, failDb: false, failTelegram: false, failScheduleInsert: false }
   let nextMessageId = 500
   const json = (body, status = 200) => new Response(JSON.stringify(body), { status })
 
@@ -34,28 +39,51 @@ export function installFakes({ mode = 'on' } = {}) {
       return json({ ok: true })
     }
 
-    // Supabase REST: agent_tasks 표 하나만 흉내 낸다.
+    // Supabase Auth 관리자 API: 사용자 목록
+    if (address.pathname.startsWith('/auth/v1/admin/users')) return json({ users: fake.users })
+
+    // Supabase REST: agent_tasks·schedule 표를 흉내 낸다.
     fake.dbCalls += 1
     if (fake.failDb) return json({ message: 'boom' }, 500)
     const method = options.method ?? 'GET'
+    const table = tables[address.pathname.split('/').pop()]
+    if (!table) return json({ message: 'no table' }, 404)
     // eq.값 과 in.(값,값) 필터만 흉내 낸다. order·limit 등은 무시한다.
     const filters = [...address.searchParams]
-      .filter(([, value]) => value.startsWith('eq.') || value.startsWith('in.('))
-      .map(([key, value]) => [key, value.startsWith('eq.') ? [value.slice(3)] : value.slice(4, -1).split(',')])
-    const matches = (row) => filters.every(([key, values]) => values.includes(String(row[key])))
+      .filter(([, value]) => /^(eq|gte|lte)\./.test(value) || value.startsWith('in.('))
+      .map(([key, value]) => {
+        if (value.startsWith('in.(')) return (row) => value.slice(4, -1).split(',').includes(String(row[key]))
+        const [op, ...rest] = value.split('.')
+        const target = rest.join('.')
+        if (op === 'gte') return (row) => String(row[key]) >= target
+        if (op === 'lte') return (row) => String(row[key]) <= target
+        return (row) => String(row[key]) === target
+      })
+    const matches = (row) => filters.every((test) => test(row))
 
     if (method === 'POST') {
-      if (fake.tasks.some((row) => row.source_update_id === body.source_update_id)) return json([])
+      if (table === tables.schedule) {
+        if (fake.failScheduleInsert) return json({ message: 'insert failed' }, 500)
+        const row = { id: randomUUID(), created_at: new Date().toISOString(), ...body }
+        table.push(row)
+        return json([structuredClone(row)], 201)
+      }
+      if (table.some((row) => row.source_update_id === body.source_update_id)) return json([])
       const row = { id: randomUUID(), reject_count: 0, feedback: null, created_at: new Date().toISOString(), ...body }
-      fake.tasks.push(row)
+      table.push(row)
       return json([structuredClone(row)], 201)
     }
     if (method === 'PATCH') {
-      const rows = fake.tasks.filter(matches)
+      const rows = table.filter(matches)
       rows.forEach((row) => Object.assign(row, body))
       return json(structuredClone(rows))
     }
-    return json(structuredClone(fake.tasks.filter(matches)))
+    if (method === 'DELETE') {
+      const rows = table.filter(matches)
+      rows.forEach((row) => table.splice(table.indexOf(row), 1))
+      return json(structuredClone(rows))
+    }
+    return json(structuredClone(table.filter(matches)))
   }
   return fake
 }
@@ -80,4 +108,21 @@ export async function callWebhook(handler, { method = 'POST', body, headers = {}
   }
   await handler({ method, body, headers }, res)
   return result
+}
+
+// 가짜 Anthropic 클라이언트: messages.create가 정해 둔 submit_plan 입력을 돌려준다.
+// reply가 함수면 요청(params)을 받아 입력을 만든다. 오류 객체면 그 오류를 던진다.
+export function fakeAnthropic(reply) {
+  const calls = []
+  return {
+    calls,
+    messages: {
+      create: async (params) => {
+        calls.push(params)
+        const input = typeof reply === 'function' ? reply(params) : reply
+        if (input instanceof Error) throw input
+        return { content: [{ type: 'tool_use', name: 'submit_plan', id: 'tu_1', input }] }
+      },
+    },
+  }
 }

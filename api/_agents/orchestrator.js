@@ -6,8 +6,9 @@
 //                                       └ 쓰기 있음 → PENDING → (결재 버튼: approval.js)
 
 import { executePlan } from './executor.js'
-import { buildTestPlan, hashPlan } from './plan.js'
-import { approvalButtons, approvalText, executionReport, interruptedText, validationFailedText } from './report.js'
+import { hashPlan } from './plan.js'
+import { choosePlanner } from './planner.js'
+import { approvalButtons, approvalText, clarificationText, executionReport, interruptedText, validationFailedText } from './report.js'
 import { loadRules, rulesStatus } from './rules.js'
 import { sendMessage } from './telegram.js'
 import { createTask, lastLogAt, listOpenTasks, transition } from './tasks.js'
@@ -33,17 +34,29 @@ export async function startInstruction({ text, chatId, updateId }, options) {
 }
 
 // PLANNING 상태 작업의 계획을 세우고 검증한 뒤, 결재 요청을 보내거나(쓰기) 바로 실행한다(읽기 전용).
-export async function planAndRoute(task, chatId, { planner = buildTestPlan } = {}) {
+export async function planAndRoute(task, chatId, { planner = choosePlanner() } = {}) {
   const rules = loadRules()
   const status = rulesStatus(rules)
 
   let plan
   try {
-    plan = planner(task.task_query, { feedback: task.feedback ?? undefined, rules })
+    plan = await planner(task.task_query, {
+      feedback: task.feedback ?? undefined,
+      previousPlan: task.plan_payload,
+      rules,
+    })
   } catch (error) {
-    await transition(task, 'FAILED', { log: { event: 'PLAN_FAILED', note: error?.message } })
-    await sendMessage(chatId, `🚫 계획을 만들지 못했어요\n지시: ${task.task_query}`)
+    console.error('[agents] 계획 작성 실패', error)
+    await transition(task, 'FAILED', { log: { event: 'PLAN_FAILED', note: String(error?.message ?? error).slice(0, 300) } })
+    await sendMessage(chatId, `🚫 계획을 만들지 못했어요 (AI 호출 실패). 잠시 뒤에 다시 보내 주세요.\n지시: ${task.task_query}`)
     return 'plan-failed'
+  }
+
+  // AI가 되묻기로 답함 (모호하거나 할 수 없는 지시). 이 작업은 닫고, 캡틴이 내용을 보태 다시 보내게 한다.
+  if (plan?.clarification) {
+    await transition(task, 'FAILED', { log: { event: 'NEEDS_INFO', question: plan.clarification } })
+    await sendMessage(chatId, clarificationText(task, plan.clarification))
+    return 'needs-info'
   }
 
   const validating = await transition(task, 'VALIDATING', {

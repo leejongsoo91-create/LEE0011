@@ -24,3 +24,13 @@ export async function rest(path, { method = 'GET', body, prefer } = {}) {
   const text = await response.text()
   return text ? JSON.parse(text) : null
 }
+
+// Supabase Auth 관리자 API (서비스 롤 키 필요). 대시보드 주인(유일한 사용자)의 id를 찾을 때만 쓴다.
+export async function authAdmin(path) {
+  const { url, key } = config()
+  const response = await fetch(`${url}/auth/v1/admin/${path}`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+  })
+  if (!response.ok) throw new Error(`supabase-auth-${response.status}`)
+  return response.json()
+}

@@ -1,7 +1,7 @@
 # 결재 통제형 멀티 에이전트 시스템 — 아키텍처
 
-> 상태: **뼈대 단계 · 2단계 완료** (지시→계획→검증→결재→실행→원복/보고 전 경로가 테스트 도구로 동작. AI 연동·부서 데이터는 나중에 채움)
-> 계획서: 「멀티 에이전트 뼈대 구축 계획서」 / 규칙서: `api/_agents/rules/global_rules.md`, `api/_agents/rules/dept_template.md`
+> 상태: **3단계 구현** (첫 실무 부서 '일정 부서' + AI 계획 작성기. 2단계 테스트 도구도 롤백 확인용으로 유지)
+> 계획서: 「멀티 에이전트 뼈대 구축 계획서」 / 규칙서: `api/_agents/rules/global_rules.md`, `api/_agents/rules/dept_template.md`, `api/_agents/rules/dept_schedule.md`
 
 ## 1. 목표
 
@@ -114,10 +114,13 @@ api/
   _agents/
     approval.js                  텔레그램 입구: 새 지시 · [승인]/[반려] 버튼 · 반려 사유 답장
     orchestrator.js              PLANNING→VALIDATING→PENDING/자동 승인, 남은 작업 정리
-    plan.js                      계획 해시 · 가짜 계획 작성기(메인 에이전트 자리) · 결재 요약
+    planner.js                   메인 에이전트: Anthropic API + 규칙서 → submit_plan 강제 호출로 JSON 계획 (되묻기 포함)
+    plan.js                      계획 해시 · 테스트 계획 작성기(낱말 시나리오) · 결재 요약
+    owner.js                     대시보드 주인 user_id (AGENT_USER_ID 또는 Auth 사용자 1명 자동)
+    tools/schedule.js            일정 부서 도구: schedule.list(read), schedule.create(write, 원복=삭제)
     validator.js                 크로스체크(코드 검증): 등록 도구, 위험도 표기, 인자, 원복 정의, 5단계 한도
     executor.js                  승인된 계획 실행 · 실패 시 역순 원복
-    registry.js                  도구·부서 레지스트리 (지금은 테스트 팀 도구 3개)
+    registry.js                  도구·부서 레지스트리 (일정 부서 2개 + 테스트 팀 3개)
     report.js                    텔레그램 문장 템플릿 (결재 요청·결과 보고·검증 실패·중단 알림)
     rules.js                     규칙서 로더 (vercel.json includeFiles로 배포에 포함)
     tasks.js / supabase.js       agent_tasks 읽기·조건부 전환·로그 추가
@@ -126,6 +129,7 @@ api/
     rules/
       global_rules.md            전사 공통 규칙
       dept_template.md           부서별 규칙 템플릿
+      dept_schedule.md           일정 부서 규칙
 ```
 
 ## 10. 켜고 끄기
@@ -143,6 +147,15 @@ api/
 
 반려하면 사유를 답장으로 받아 같은 작업을 다시 계획한다(사유에 위 낱말이 있으면 그 시나리오로 바뀐다).
 
+3단계부터: `ANTHROPIC_API_KEY`가 있으면 위 표 대신 **AI 계획 작성기**가 쓰인다(`AGENT_PLANNER=test`로 되돌릴 수 있음).
+
+- AI는 규칙서(전사 공통 + 일정 부서)와 도구 목록, 현재 한국 시각을 받고 `submit_plan` 도구로만 답한다. 실행하지 않는다.
+- 위험도는 AI가 아니라 레지스트리 값을 코드가 채운다. 검증기가 인자·도구를 다시 검사한다.
+- 모호하면 AI가 되묻고(`NEEDS_INFO`), 작업은 닫힌다. 캡틴이 내용을 보태 다시 보낸다.
+- 일정 도구는 모든 조회·등록·삭제에 주인 `user_id` 조건을 코드가 붙인다.
+- 롤백 확인: 지시에 "실패 테스트"를 넣으면 AI가 `test.fail_write`를 마지막 단계로 붙인다 → 등록한 일정이 삭제(원복)된다.
+- 웹훅 함수 최대 실행 시간 60초(`vercel.json`), AI 호출은 30초 제한·재시도 1회.
+
 테스트: `npm run test:agents` (가짜 Supabase·텔레그램, 외부 패키지 없음)
 
 ## 11. 단계별 계획
@@ -151,8 +164,9 @@ api/
 | --- | --- | --- |
 | 0 | 규칙서 3개 작성 | 문서 검토 완료 |
 | 1 | (1a) `agent_tasks` SQL — **Supabase 실행 완료** / (1b) 웹훅의 `callback_query` 수신과 `update_id` 중복 방지 — **배포·실제 확인 완료** | 가짜 입력으로 상태가 바뀌고 기존 echo는 그대로 |
-| 2 | 오케스트레이터 뼈대와 스위치 — **구현·자동 테스트 37개 통과, 배포 후 폰 확인 대기** | 모의 텔레그램으로 지시→계획→검증→결재→실행→보고 전 경로, 반려·만료·중복 경로 테스트 통과 |
-| 3 | 첫 부서·도구, 실제 LLM | 이번 범위 밖. 별도 승인 |
+| 2 | 오케스트레이터 뼈대와 스위치 — **폰 확인 완료** | 모의 텔레그램으로 지시→계획→검증→결재→실행→보고 전 경로, 반려·만료·중복 경로 테스트 통과 |
+| 3 | 첫 부서(일정)·도구, 실제 LLM — **구현·자동 테스트 54개 통과, 배포 후 폰 확인 대기** | 자연어 지시 → AI 계획 → 결재 → 실제 일정 등록, 실패 시 삭제 원복 |
+| 4 | 일정 도래 시 자동 계획·결재 요청 (크론) | 별도 보고서·승인 |
 
 ## 12. 열린 항목
 

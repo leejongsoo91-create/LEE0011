@@ -53,6 +53,10 @@ export function describePlan(plan) {
   const steps = Array.isArray(plan?.steps) ? plan.steps : []
   if (steps.length === 0) return '(실행할 단계 없음)'
   return steps
-    .map((s, index) => `${index + 1}. ${getTool(s.tool)?.label ?? s.tool} [${RISK_LABEL[s.risk] ?? s.risk}]`)
+    .map((s, index) => {
+      const tool = getTool(s.tool)
+      const detail = tool?.describe && !tool.check?.(s.args) ? `: ${tool.describe(s.args)}` : ''
+      return `${index + 1}. ${tool?.label ?? s.tool}${detail} [${RISK_LABEL[s.risk] ?? s.risk}]`
+    })
     .join('\n')
 }

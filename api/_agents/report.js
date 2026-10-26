@@ -4,7 +4,13 @@ import { describePlan } from './plan.js'
 import { getTool } from './registry.js'
 
 const MAX_QUERY_SHOWN = 300
-const TEST_NOTE = '🧪 테스트 모드: 가짜 도구라 실제 데이터는 바뀌지 않습니다.'
+const TEST_NOTE = '🧪 테스트 도구만 쓰는 계획이라 실제 데이터는 바뀌지 않습니다.'
+const REAL_NOTE = '⚠️ 실제 대시보드 데이터가 바뀝니다. (실패하면 역순으로 원복)'
+
+// 계획이 실제 데이터를 건드리는지(테스트 팀 도구만 있는지)
+const onlyTestTools = (plan) => (plan?.steps ?? []).every((step) => getTool(step.tool)?.dept === 'test')
+const plannerLine = (plan) =>
+  plan?.planner === 'ai' ? `🤖 계획: AI (${plan.model})` : '🧪 계획: 테스트 계획 작성기 (AI 아님)'
 
 const queryOf = (task) =>
   task.task_query.length > MAX_QUERY_SHOWN ? `${task.task_query.slice(0, MAX_QUERY_SHOWN)}…` : task.task_query
@@ -15,13 +21,15 @@ export const kst = (iso) =>
   new Date(iso).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false })
 
 const rulesLine = (status) =>
-  `📚 규칙서: 전사 공통 ${status?.global ? '✓' : '✗'} · 부서 템플릿 ${status?.deptTemplate ? '✓' : '✗'}`
+  `📚 규칙서: 전사 공통 ${status?.global ? '✓' : '✗'} · 일정 부서 ${status?.schedule ? '✓' : '✗'} · 부서 템플릿 ${status?.deptTemplate ? '✓' : '✗'}`
 
 export function approvalText(task, rules) {
   const lines = ['📝 [결재 요청]', `지시: ${queryOf(task)}`]
   if (task.reject_count > 0) lines.push(`🔁 재계획 ${task.reject_count}회차 · 반려 사유: ${task.feedback ?? '(없음)'}`)
-  lines.push('', '계획:', describePlan(task.plan_payload), '', rulesLine(rules))
-  lines.push(`⏰ ${kst(task.expires_at)}까지 결정해 주세요 (30분 뒤 만료)`, TEST_NOTE)
+  if (task.plan_payload?.summary) lines.push(`요약: ${task.plan_payload.summary}`)
+  lines.push('', '계획:', describePlan(task.plan_payload), '', plannerLine(task.plan_payload), rulesLine(rules))
+  lines.push(`⏰ ${kst(task.expires_at)}까지 결정해 주세요 (30분 뒤 만료)`)
+  lines.push(onlyTestTools(task.plan_payload) ? TEST_NOTE : REAL_NOTE)
   return lines.join('\n')
 }
 
@@ -42,7 +50,7 @@ export function executionReport(task, outcome, rules) {
   const lines = [HEAD[outcome.status] ?? `결과: ${outcome.status}`, `지시: ${queryOf(task)}`]
   if ((task.event_logs ?? []).some((entry) => entry.event === 'AUTO_APPROVED')) {
     lines.push('(읽기 전용 계획이라 결재 없이 실행했어요)')
-    if (rules) lines.push(rulesLine(rules))
+    if (rules) lines.push(plannerLine(task.plan_payload), rulesLine(rules))
   }
   if (outcome.results?.length) {
     lines.push('', '실행한 단계:')
@@ -59,9 +67,13 @@ export function executionReport(task, outcome, rules) {
   } else if (outcome.failure) {
     lines.push('', '되돌릴 단계 없음 (먼저 성공한 쓰기가 없었어요)')
   }
-  lines.push('', `상태: ${task.status}`, TEST_NOTE)
+  lines.push('', `상태: ${task.status}`)
+  if (onlyTestTools(task.plan_payload)) lines.push(TEST_NOTE)
   return lines.join('\n')
 }
+
+export const clarificationText = (task, question) =>
+  ['❓ 계획을 세우기 전에 확인이 필요해요', `지시: ${queryOf(task)}`, '', question, '', '내용을 보태서 지시를 다시 보내 주세요.'].join('\n')
 
 export const validationFailedText = (task, errors) =>
   ['🚫 계획 검증 실패 — 결재 요청을 보내지 않았어요', `지시: ${queryOf(task)}`, '', ...errors.map((e) => `• ${e}`)].join('\n')

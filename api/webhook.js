@@ -1,6 +1,8 @@
 // 텔레그램 웹훅 수신부: 봇에게 온 메시지를 받아서 답장한다.
 // 지금은 통신 테스트용 메아리(echo)만 하고, 나중에 AI가 문장을 해석해 일정 등을 등록하는 로직을 여기에 붙인다.
 
+import { handleUpdate } from './_agents/approval.js'
+
 const TELEGRAM_TEXT_LIMIT = 4096
 
 async function reply(token, chatId, text) {
@@ -26,6 +28,17 @@ export default async function handler(req, res) {
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET
   if (secret && req.headers['x-telegram-bot-api-secret-token'] !== secret) {
     return res.status(401).json({ status: 'unauthorized' })
+  }
+
+  // 결재 통제형 에이전트(결재 테스트 모드): AGENT_MODE=on일 때만 켜진다. 꺼져 있으면 아래 echo 응답이 그대로 동작한다.
+  if (process.env.AGENT_MODE === 'on') {
+    try {
+      await handleUpdate(req.body)
+    } catch (error) {
+      // 처리에 실패해도 200을 돌려줘야 텔레그램이 같은 요청을 계속 다시 보내지 않는다.
+      console.error('[webhook] 에이전트 처리 실패', error)
+    }
+    return res.status(200).json({ status: 'success' })
   }
 
   const token = process.env.TELEGRAM_BOT_TOKEN

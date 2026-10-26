@@ -41,11 +41,12 @@ test('시스템 프롬프트: 현재 한국 시간, 규칙서 2개, AI에게 보
   assert.equal(nowKst(new Date('2026-10-27T14:59:00Z')), '2026-10-27(화) 23:59')
 })
 
-test('submit_plan 강제 호출, 위험도는 AI가 아니라 레지스트리 값', async () => {
+test('submit_plan 도구(auto), 위험도는 AI가 아니라 레지스트리 값', async () => {
   const client = fakeAnthropic({ summary: '내일 3시 → 10/28(수) 15:00', steps: [{ ...createStep(), risk: 'read' }, { tool: 'evil.tool', args: {} }] })
   const plan = await aiPlan('내일 3시 회의', { client, rules: loadRules() })
   const params = client.calls[0]
-  assert.deepEqual(params.tool_choice, { type: 'tool', name: 'submit_plan' })
+  // claude-sonnet-5-5는 특정 도구 강제(type tool/any)를 거부한다 → auto
+  assert.deepEqual(params.tool_choice, { type: 'auto' })
   assert.equal(params.model, 'claude-sonnet-5-5')
   assert.deepEqual(params.tools[0].input_schema.properties.steps.items.properties.tool.enum, ['schedule.list', 'schedule.create', 'test.fail_write'])
   assert.deepEqual(plan.steps.map((s) => s.risk), ['write', 'unknown'])
@@ -119,6 +120,12 @@ test('D. 모호한 지시 → AI가 되물음 → 결재 없이 질문 전송, �
   assert.equal(lastTask().event_logs.at(-1).event, 'NEEDS_INFO')
   assert.match(fake.sent.at(-1).text, /❓[\s\S]*어느 날짜인가요/)
   assert.equal(fake.schedule.length, 0)
+})
+
+test('D-2. AI가 도구 없이 글로만 답함 → 그 글을 질문으로 전송', async () => {
+  useAi('일정 수정은 아직 지원하지 않아요. 새로 등록할까요?')
+  assert.equal(await send('회의 시간 바꿔 줘'), 'needs-info')
+  assert.match(fake.sent.at(-1).text, /❓[\s\S]*일정 수정은 아직 지원하지 않아요/)
 })
 
 test('E. AI 호출 실패 → PLAN_FAILED 안내', async () => {

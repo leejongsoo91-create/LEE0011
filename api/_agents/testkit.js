@@ -121,7 +121,8 @@ export function fakeAnthropic(reply) {
         calls.push(params)
         const input = typeof reply === 'function' ? reply(params) : reply
         if (input instanceof Error) throw input
-        return { content: [{ type: 'tool_use', name: 'submit_plan', id: 'tu_1', input }] }
+        if (typeof input === 'string') return { stop_reason: 'end_turn', content: [{ type: 'text', text: input }] }
+        return { stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'submit_plan', id: 'tu_1', input }] }
       },
     },
   }

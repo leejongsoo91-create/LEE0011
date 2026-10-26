@@ -1,6 +1,8 @@
 // 메인 에이전트(계획 작성기). 캡틴의 지시를 받아 실행 계획(JSON)만 만든다. 실행은 하지 않는다.
 // Anthropic API에 규칙서(전사 공통 + 부서)와 도구 목록을 시스템 프롬프트로 주고,
-// submit_plan 도구 호출을 강제해서 항상 정해진 모양의 JSON을 받는다.
+// submit_plan 도구로만 답하게 해서 정해진 모양의 JSON을 받는다.
+// (claude-sonnet-5-5는 tool_choice로 특정 도구를 강제할 수 없어 'auto'로 두고 프롬프트로 지시한다.
+//  도구를 안 부르고 글로만 답하면 그 글을 캡틴에게 보내는 질문으로 처리한다.)
 //
 // 돌려주는 값
 //   계획:   { version: 3, planner: 'ai', model, summary, steps: [{ tool, args, risk }], feedback? }
@@ -106,21 +108,29 @@ export const setAnthropicClient = (client) => {
   sharedClient = client
 }
 const defaultClient = () =>
-  (sharedClient ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 30_000, maxRetries: 1 }))
+  (sharedClient ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 45_000, maxRetries: 1 }))
 
 // AI 계획 작성기. client는 테스트에서 가짜를 넣을 수 있다.
 export async function aiPlan(query, { feedback, rules, previousPlan, client = defaultClient(), now = new Date() } = {}) {
   const model = process.env.AGENT_MODEL?.trim() || DEFAULT_MODEL
   const response = await client.messages.create({
     model,
-    max_tokens: 1024,
+    max_tokens: 4096,
     system: buildSystemPrompt(rules, now),
     tools: [submitPlanTool()],
-    tool_choice: { type: 'tool', name: 'submit_plan' },
+    tool_choice: { type: 'auto' },
     messages: [{ role: 'user', content: buildUserMessage(query, { feedback, previousPlan }) }],
   })
   const call = response?.content?.find((block) => block.type === 'tool_use' && block.name === 'submit_plan')
-  if (!call) throw new Error('AI가 계획을 제출하지 않았습니다')
+  if (!call) {
+    const text = (response?.content ?? [])
+      .filter((block) => block.type === 'text')
+      .map((block) => block.text)
+      .join('\n')
+      .trim()
+    if (text) return { clarification: text.slice(0, 500) }
+    throw new Error(`AI가 계획을 제출하지 않았습니다 (stop_reason: ${response?.stop_reason ?? '알 수 없음'})`)
+  }
   const input = call.input ?? {}
   const steps = Array.isArray(input.steps) ? input.steps : []
   const summary = typeof input.summary === 'string' ? input.summary.slice(0, 500) : ''

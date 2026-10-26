@@ -9,7 +9,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export const isTaskId = (value) => UUID.test(value ?? '')
 
 // 새 작업을 만든다. 같은 source_update_id가 이미 있으면(텔레그램 재전송) 만들지 않고 null을 돌려준다.
-export async function createTask({ query, sourceUpdateId, status, plan, planHash, expiresAt, log }) {
+export async function createTask({ query, sourceUpdateId, status, plan = {}, planHash = null, expiresAt = null, log }) {
   const rows = await rest(`${TABLE}?on_conflict=source_update_id`, {
     method: 'POST',
     prefer: 'resolution=ignore-duplicates,return=representation',
@@ -42,3 +42,31 @@ export async function transition(task, to, { log, patch = {} } = {}) {
   })
   return rows?.[0] ?? null
 }
+
+// 상태는 그대로 두고 로그만 덧붙인다. 그 사이 상태가 바뀌었으면 null (예: 실행 중 작업이 '중단'으로 정리됨).
+export async function appendLog(task, entries) {
+  const list = (Array.isArray(entries) ? entries : [entries]).map((entry) => ({ at: new Date().toISOString(), ...entry }))
+  const rows = await rest(`${TABLE}?id=eq.${task.id}&status=eq.${task.status}`, {
+    method: 'PATCH',
+    prefer: 'return=representation',
+    body: { event_logs: [...(task.event_logs ?? []), ...list] },
+  })
+  return rows?.[0] ?? null
+}
+
+// 아직 끝나지 않은 작업(결재 대기·반려 사유 대기·실행 중). 만료·중단 정리에 쓴다.
+export async function listOpenTasks() {
+  return (await rest(`${TABLE}?status=in.(PENDING,REJECTED,EXECUTING)&select=*`)) ?? []
+}
+
+// 반려 사유를 묻는 메시지(messageId)에 단 답장이 어느 작업의 것인지 찾는다. 세션 표 없이 event_logs로 찾는다.
+export async function findAwaitingReason(messageId) {
+  const rows = (await rest(`${TABLE}?status=eq.REJECTED&select=*&order=updated_at.desc&limit=20`)) ?? []
+  return (
+    rows.find((row) =>
+      (row.event_logs ?? []).some((entry) => entry.event === 'REASON_REQUESTED' && entry.prompt_message_id === messageId),
+    ) ?? null
+  )
+}
+
+export const lastLogAt = (task) => Date.parse(task.event_logs?.at(-1)?.at ?? task.updated_at ?? task.created_at)

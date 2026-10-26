@@ -13,7 +13,7 @@ beforeEach(() => {
 // 새 지시를 하나 보내 결재 대기 작업과 그 버튼 데이터를 얻는다.
 let nextUpdateId = 100
 async function createPending(text = '내일 3시 회의') {
-  assert.equal(await handleUpdate(message(text, { updateId: nextUpdateId++ })), 'created')
+  assert.equal(await handleUpdate(message(text, { updateId: nextUpdateId++ })), 'pending')
   const task = fake.tasks.at(-1)
   return { task, approve: `a:${task.id}`, reject: `r:${task.id}` }
 }
@@ -24,6 +24,7 @@ test('1. 새 지시 → 작업 1건 생성, 결재 메시지(버튼 2개) 전송
   assert.equal(task.status, 'PENDING')
   assert.equal(task.task_query, '내일 3시 회의')
   assert.equal(task.plan_hash, hashPlan(task.plan_payload))
+  assert.deepEqual(task.event_logs.map((e) => e.event), ['CREATED', 'PLANNED', 'VALIDATED'])
   assert.ok(new Date(task.expires_at) > new Date())
   assert.equal(fake.sent.length, 1)
   const buttons = fake.sent[0].reply_markup.inline_keyboard[0]
@@ -38,13 +39,14 @@ test('2. 같은 update_id 재전송 → 작업·메시지가 더 생기지 않�
   assert.equal(fake.sent.length, 1)
 })
 
-test('3. [승인] → APPROVED, 버튼 제거, 로그 기록', async () => {
+test('3. [승인] → APPROVED를 거쳐 실행·완료, 버튼 제거, 로그 기록', async () => {
   const { task, approve } = await createPending()
   assert.equal(await handleUpdate(click(approve)), 'approved')
-  assert.equal(task.status, 'APPROVED')
-  assert.equal(task.event_logs.at(-1).event, 'APPROVED')
-  assert.equal(task.event_logs.length, 2)
+  assert.equal(task.status, 'COMPLETED')
+  const events = task.event_logs.map((e) => e.event)
+  assert.deepEqual(events.slice(3), ['APPROVED', 'EXECUTE_START', 'STEP_START', 'STEP_DONE', 'COMPLETED'])
   assert.deepEqual(fake.edits[0].reply_markup, { inline_keyboard: [] })
+  assert.match(fake.sent.at(-1).text, /✅ 완료/)
   assert.match(fake.edits[0].text, /승인됨/)
   assert.equal(fake.answers.length, 1)
 })
@@ -61,13 +63,14 @@ test('5. 같은 버튼을 두 번(순서대로, 그리고 동시에) 눌러도 �
   assert.equal(await handleUpdate(click(first.approve)), 'approved')
   assert.equal(await handleUpdate(click(first.approve)), 'already')
   assert.equal(await handleUpdate(click(first.reject)), 'already')
-  assert.equal(first.task.status, 'APPROVED')
-  assert.equal(first.task.event_logs.length, 2)
+  assert.equal(first.task.status, 'COMPLETED')
+  assert.equal(first.task.event_logs.filter((e) => e.event === 'APPROVED').length, 1)
+  assert.equal(first.task.event_logs.filter((e) => e.event === 'EXECUTE_START').length, 1)
 
   const second = await createPending('동시에')
   const results = await Promise.all([handleUpdate(click(second.approve)), handleUpdate(click(second.reject))])
   assert.deepEqual(results.filter((r) => r === 'approved' || r === 'rejected').length, 1)
-  assert.equal(second.task.event_logs.length, 2)
+  assert.equal(second.task.event_logs.filter((e) => e.event === 'APPROVED' || e.event === 'REJECTED').length, 1)
 })
 
 test('6. 만료 후 클릭 → FAILED + EXPIRED 로그', async () => {

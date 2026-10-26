@@ -14,6 +14,7 @@ export function installFakes({ mode = 'on' } = {}) {
   else delete process.env.AGENT_MODE
 
   const fake = { tasks: [], sent: [], edits: [], answers: [], dbCalls: 0, failDb: false, failTelegram: false }
+  let nextMessageId = 500
   const json = (body, status = 200) => new Response(JSON.stringify(body), { status })
 
   globalThis.fetch = async (url, options = {}) => {
@@ -23,7 +24,11 @@ export function installFakes({ mode = 'on' } = {}) {
     if (address.hostname === 'api.telegram.org') {
       const method = address.pathname.split('/').pop()
       if (fake.failTelegram) return json({ ok: false }, 500)
-      if (method === 'sendMessage') fake.sent.push(body)
+      if (method === 'sendMessage') {
+        const messageId = nextMessageId++
+        fake.sent.push({ ...body, message_id: messageId })
+        return json({ ok: true, result: { message_id: messageId } })
+      }
       if (method === 'editMessageText') fake.edits.push(body)
       if (method === 'answerCallbackQuery') fake.answers.push(body)
       return json({ ok: true })
@@ -33,10 +38,11 @@ export function installFakes({ mode = 'on' } = {}) {
     fake.dbCalls += 1
     if (fake.failDb) return json({ message: 'boom' }, 500)
     const method = options.method ?? 'GET'
-    const filters = Object.fromEntries(
-      [...address.searchParams].filter(([, value]) => value.startsWith('eq.')).map(([key, value]) => [key, value.slice(3)]),
-    )
-    const matches = (row) => Object.entries(filters).every(([key, value]) => String(row[key]) === value)
+    // eq.값 과 in.(값,값) 필터만 흉내 낸다. order·limit 등은 무시한다.
+    const filters = [...address.searchParams]
+      .filter(([, value]) => value.startsWith('eq.') || value.startsWith('in.('))
+      .map(([key, value]) => [key, value.startsWith('eq.') ? [value.slice(3)] : value.slice(4, -1).split(',')])
+    const matches = (row) => filters.every(([key, values]) => values.includes(String(row[key])))
 
     if (method === 'POST') {
       if (fake.tasks.some((row) => row.source_update_id === body.source_update_id)) return json([])
@@ -54,9 +60,9 @@ export function installFakes({ mode = 'on' } = {}) {
   return fake
 }
 
-export const message = (text, { updateId = 1, chatId = 42 } = {}) => ({
+export const message = (text, { updateId = 1, chatId = 42, replyTo } = {}) => ({
   update_id: updateId,
-  message: { message_id: 10, chat: { id: chatId }, text },
+  message: { message_id: 10, chat: { id: chatId }, text, ...(replyTo != null ? { reply_to_message: { message_id: replyTo } } : {}) },
 })
 
 export const click = (data, { chatId = 42, messageId = 77 } = {}) => ({

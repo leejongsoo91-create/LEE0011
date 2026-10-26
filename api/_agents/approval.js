@@ -1,76 +1,68 @@
-// 결재 처리: 텔레그램 업데이트를 받아 (1) 새 지시를 결재 대기 작업으로 만들고 (2) [승인]/[반려] 버튼 응답을 처리한다.
-// 1b 단계에서는 "결재 테스트 모드"라서 계획은 가짜이고, 승인되어도 APPROVED에서 멈춘다. (실행은 2단계)
+// 텔레그램 업데이트 입구: 새 지시, [승인]/[반려] 버튼, 반려 사유 답장을 나눠 처리한다.
+// 계획·검증은 orchestrator.js, 실행·원복은 executor.js가 맡는다.
 
-import { buildTestPlan, describePlan, hashPlan } from './plan.js'
-import { answerCallbackQuery, editMessageText, sendMessage } from './telegram.js'
-import { createTask, getTask, isTaskId, transition } from './tasks.js'
+import {
+  APPROVAL_TTL_MS,
+  MAX_REJECTS,
+  planAndRoute,
+  runApproved,
+  startInstruction,
+  sweepStale,
+} from './orchestrator.js'
+import { hashPlan } from './plan.js'
+import { REASON_PROMPT, approvalText } from './report.js'
+import { answerCallbackQuery, editMessageText, forceReply, sendMessage } from './telegram.js'
+import { appendLog, findAwaitingReason, getTask, isTaskId, transition } from './tasks.js'
 
-export const APPROVAL_TTL_MS = 30 * 60 * 1000
-const MAX_QUERY_SHOWN = 300
+export { APPROVAL_TTL_MS }
 
 const isOwner = (chatId) => {
   const owner = process.env.TELEGRAM_CHAT_ID
   return Boolean(owner) && chatId != null && String(chatId) === String(owner)
 }
 
-const kst = (iso) =>
-  new Date(iso).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false })
-
-function approvalText(task) {
-  const query = task.task_query.length > MAX_QUERY_SHOWN ? `${task.task_query.slice(0, MAX_QUERY_SHOWN)}…` : task.task_query
-  return [
-    '📝 [결재 요청]',
-    `지시: ${query}`,
-    '',
-    '계획:',
-    describePlan(task.plan_payload),
-    '',
-    `⏰ ${kst(task.expires_at)}까지 결정해 주세요 (30분 뒤 만료)`,
-    '🧪 테스트 모드: 가짜 계획이라 승인해도 실제로 실행되는 것은 없습니다.',
-  ].join('\n')
-}
-
-const approvalButtons = (id) => ({
-  inline_keyboard: [[{ text: '✅ 승인', callback_data: `a:${id}` }, { text: '❌ 반려', callback_data: `r:${id}` }]],
-})
-
-// 새 지시 → 결재 대기 작업 만들기 + 결재 메시지 보내기
-async function handleInstruction(update) {
+// 일반 메시지: (1) 남은 작업 정리 (2) 반려 사유 답장이면 재계획 (3) 아니면 새 지시
+async function handleMessage(update) {
   const message = update.message
   const text = message.text?.trim()
   if (!text) return 'no-text'
   const chatId = message.chat?.id
   if (!isOwner(chatId)) return 'not-owner'
 
-  const plan = buildTestPlan(text)
-  let task
   try {
-    task = await createTask({
-      query: text,
-      sourceUpdateId: update.update_id,
-      status: 'PENDING',
-      plan,
-      planHash: hashPlan(plan),
-      expiresAt: new Date(Date.now() + APPROVAL_TTL_MS).toISOString(),
-      log: { event: 'CREATED', note: '결재 테스트 모드: 가짜 계획으로 결재 대기' },
-    })
+    await sweepStale(chatId)
   } catch (error) {
-    console.error('[agents] 작업 생성 실패', error)
-    await sendMessage(chatId, '⚠️ 작업을 저장하지 못했어요. 잠시 뒤에 다시 보내 주세요.')
-    return 'error'
+    console.error('[agents] 남은 작업 정리 실패', error)
   }
-  if (!task) return 'duplicate'
 
-  const sent = await sendMessage(chatId, approvalText(task), approvalButtons(task.id))
-  if (!sent.ok) {
-    // 버튼이 없는 결재 대기 작업이 남지 않도록 닫는다.
-    await transition(task, 'FAILED', { log: { event: 'SEND_FAILED', note: '결재 메시지를 보내지 못함' } }).catch(() => null)
-    return 'error'
+  const replyTo = message.reply_to_message?.message_id
+  if (replyTo != null) {
+    let task = null
+    try {
+      task = await findAwaitingReason(replyTo)
+    } catch (error) {
+      console.error('[agents] 반려 작업 조회 실패', error)
+    }
+    if (task) return handleReason(task, text, chatId)
   }
-  return 'created'
+
+  return startInstruction({ text, chatId, updateId: update.update_id })
 }
 
-// 버튼 응답 처리. 검사 4개를 모두 통과해야 상태가 바뀐다.
+// 반려 사유 답장 → "취소"면 종료, 아니면 사유를 feedback에 담아 PLANNING으로 되돌려 재계획
+async function handleReason(task, text, chatId) {
+  if (text === '취소') {
+    const cancelled = await transition(task, 'FAILED', { log: { event: 'CANCELLED', note: '반려 후 취소' } })
+    if (!cancelled) return 'already'
+    await sendMessage(chatId, `🛑 작업을 취소했어요.\n지시: ${task.task_query}`)
+    return 'cancelled'
+  }
+  const planning = await transition(task, 'PLANNING', { log: { event: 'REPLANNING', feedback: text }, patch: { feedback: text } })
+  if (!planning) return 'already'
+  return planAndRoute(planning, chatId)
+}
+
+// 버튼 응답. 검사 4개를 모두 통과해야 상태가 바뀐다.
 async function handleCallback(callback) {
   const chatId = callback.message?.chat?.id ?? callback.from?.id
   if (!isOwner(chatId)) return 'not-owner'
@@ -113,7 +105,7 @@ async function handleCallback(callback) {
     return 'expired'
   }
 
-  // 검사 3: 승인할 때 본 계획과 지금 저장된 계획이 같은가
+  // 검사 3: 결재 요청 때의 계획과 지금 저장된 계획이 같은가
   if (hashPlan(task.plan_payload) !== task.plan_hash) {
     await transition(task, 'FAILED', { log: { event: 'HASH_MISMATCH', note: '계획이 승인 요청 이후 바뀜' } }).catch(() => null)
     await reply('계획이 바뀌어 거부했어요')
@@ -121,13 +113,14 @@ async function handleCallback(callback) {
     return 'hash-mismatch'
   }
 
-  // 마지막: "PENDING일 때만"이라는 조건을 건 업데이트 한 번. 먼저 도착한 요청 하나만 성공한다.
+  // 마지막: "PENDING일 때만" 조건을 건 업데이트 한 번. 먼저 도착한 요청 하나만 성공한다.
   const approve = action === 'a'
+  const rejectCount = (task.reject_count ?? 0) + (approve ? 0 : 1)
   let updated
   try {
     updated = await transition(task, approve ? 'APPROVED' : 'REJECTED', {
-      log: { event: approve ? 'APPROVED' : 'REJECTED' },
-      patch: approve ? {} : { reject_count: (task.reject_count ?? 0) + 1 },
+      log: approve ? { event: 'APPROVED' } : { event: 'REJECTED', count: rejectCount },
+      patch: approve ? {} : { reject_count: rejectCount },
     })
   } catch (error) {
     console.error('[agents] 상태 전환 실패', error)
@@ -140,12 +133,25 @@ async function handleCallback(callback) {
   }
 
   if (approve) {
-    await reply('승인했어요')
-    await close(`✅ 승인됨\n지시: ${task.task_query}\n(테스트 모드: 실행 단계는 아직 연결되지 않았습니다.)`)
+    await reply('승인했어요. 실행합니다')
+    await close(`✅ 승인됨 — 실행 결과는 아래 메시지로 보내요\n지시: ${task.task_query}`)
+    await runApproved(updated, chatId)
     return 'approved'
   }
+
+  // 반려: 한도를 넘으면 종료, 아니면 사유를 답장으로 받는다.
+  if (rejectCount > MAX_REJECTS) {
+    await transition(updated, 'FAILED', { log: { event: 'REJECT_LIMIT', note: `반려 ${rejectCount}회` } })
+    await reply('반려 한도를 넘어 작업을 끝냈어요')
+    await close(`❌ 반려 ${rejectCount}회째라 작업을 끝냈어요\n지시: ${task.task_query}`)
+    return 'reject-limit'
+  }
   await reply('반려했어요')
-  await close(`❌ 반려됨\n지시: ${task.task_query}`)
+  await close(`❌ 반려됨 (${rejectCount}/${MAX_REJECTS}회)\n지시: ${task.task_query}`)
+  const prompt = await sendMessage(chatId, REASON_PROMPT, forceReply('반려 사유 (또는 취소)'))
+  if (prompt.messageId != null) {
+    await appendLog(updated, { event: 'REASON_REQUESTED', prompt_message_id: prompt.messageId }).catch(() => null)
+  }
   return 'rejected'
 }
 
@@ -153,6 +159,6 @@ async function handleCallback(callback) {
 export async function handleUpdate(update) {
   if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_CHAT_ID) return 'not-configured'
   if (update?.callback_query) return handleCallback(update.callback_query)
-  if (update?.message) return handleInstruction(update)
+  if (update?.message) return handleMessage(update)
   return 'ignored'
 }

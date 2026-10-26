@@ -1,9 +1,24 @@
 {
-  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/" }],
+  "rewrites": [
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/"
+    }
+  ],
   "headers": [
     {
       "source": "/(sw.js|registerSW.js)",
-      "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
     }
-  ]
+  ],
+  "functions": {
+    "api/webhook.js": {
+      "includeFiles": "api/_agents/rules/**"
+    }
+  }
 }

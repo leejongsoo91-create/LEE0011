@@ -1,6 +1,6 @@
 # 결재 통제형 멀티 에이전트 시스템 — 아키텍처
 
-> 상태: **뼈대 단계** (규칙서와 상태 흐름만 확정, AI 연동·부서 데이터는 나중에 채움)
+> 상태: **뼈대 단계 · 2단계 완료** (지시→계획→검증→결재→실행→원복/보고 전 경로가 테스트 도구로 동작. AI 연동·부서 데이터는 나중에 채움)
 > 계획서: 「멀티 에이전트 뼈대 구축 계획서」 / 규칙서: `api/_agents/rules/global_rules.md`, `api/_agents/rules/dept_template.md`
 
 ## 1. 목표
@@ -33,25 +33,28 @@
 작업 하나는 `agent_tasks` 표의 한 줄이고, `status` 컬럼이 아래 8개 값 중 하나다.
 
 ```
-PLANNING ──→ VALIDATING ──통과──→ PENDING ──승인──→ APPROVED ──→ EXECUTING ──→ COMPLETED
-   ↑  ↑            │                 │  │                              │
-   │  └─ 누락·위험 ┘ 되묻기          │  └─ 30분 경과(만료) ──→ FAILED ←── 오류·원복
-   │                                 │반려                              ↑
-   └──── 피드백 반영 ←──── REJECTED ←┘ ── 3회 초과 ─────────────────────┘
+PLANNING ──→ VALIDATING ──쓰기 있음──→ PENDING ──승인──→ APPROVED ──→ EXECUTING ──→ COMPLETED
+   ↑              │  └──읽기만(AUTO_APPROVED)──────────────↗                │
+   │              └─ 검증 실패 ──→ FAILED ←── 만료·취소·반려 3회 초과 ←─────┤ 오류 → 역순 원복
+   │                                 │반려                                  │ 중단(2분) → 알림만
+   └── 사유 답장(feedback) ← REJECTED ←┘
 ```
 
 | 상태 | 의미 | 다음 상태 | 전환 조건 |
 | --- | --- | --- | --- |
 | `PLANNING` (기본값) | 초안 계획서 작성 중 | `VALIDATING` | 초안 완료 |
-| `VALIDATING` | 크로스체크 검증 중 | `PENDING` / `PLANNING` | 통과 / 누락·위험 발견 → 캡틴에게 되묻고 답을 받으면 재계획 |
+| `VALIDATING` | 크로스체크 검증 중 | `PENDING` / `APPROVED` / `FAILED` | 쓰기 단계가 있으면 결재 대기 / 읽기 전용이면 자동 승인(`AUTO_APPROVED`) / 검증 실패. (되묻기는 3단계 AI 계획에서) |
 | `PENDING` | 결재 대기 (`expires_at`까지) | `APPROVED` / `REJECTED` / `FAILED` | [승인] / [반려] / 만료 |
 | `APPROVED` | 승인됨, 실행 전 | `EXECUTING` | 실행기가 `plan_hash`를 다시 확인한 뒤 시작 |
-| `REJECTED` | 반려됨, 피드백 저장 | `PLANNING` / `FAILED` | 재계획 / 반려 3회 초과 |
-| `EXECUTING` | 승인된 계획 실행 중 | `COMPLETED` / `FAILED` | 전 단계 성공 / 오류 → 실행한 단계를 역순으로 원복 |
+| `REJECTED` | 반려됨, 사유 답장 대기 | `PLANNING` / `FAILED` | 사유 답장 → `feedback` 저장 후 재계획 / "취소" 답장, 반려 4번째(3회 초과), 30분 무응답 |
+| `EXECUTING` | 승인된 계획 실행 중 | `COMPLETED` / `FAILED` | 전 단계 성공 / 오류 → 실행한 쓰기 단계를 역순으로 원복 / 2분 넘게 기록 없음 → `INTERRUPTED`(자동 원복 없이 알림) |
 | `COMPLETED` | 완료 (끝) | 없음 | |
 | `FAILED` | 실패·원복 완료, 만료, 반려 3회 초과 (끝) | 없음 | 사유는 `event_logs`에 기록 |
 
 - 만료는 별도 상태 없이 `FAILED`로 처리하고, `event_logs`에 `EXPIRED` 사유를 남긴다.
+- 크론은 쓰지 않는다. 봇에 메시지가 올 때마다 남은 작업(만료된 `PENDING`, 30분 넘은 `REJECTED`, 2분 넘게 멈춘 `EXECUTING`)을 정리한다.
+- 반려 사유는 봇이 보낸 `force_reply` 메시지에 단 답장으로 받는다. 그 메시지 번호를 `event_logs`의 `REASON_REQUESTED`에 적어 두어 세션 표 없이 작업을 찾는다.
+- `event_logs`의 사건 이름: `CREATED` `PLANNED` `VALIDATED` `VALIDATION_FAILED` `AUTO_APPROVED` `APPROVED` `REJECTED` `REASON_REQUESTED` `REPLANNING` `CANCELLED` `REJECT_LIMIT` `REASON_TIMEOUT` `EXPIRED` `HASH_MISMATCH` `SEND_FAILED` `EXECUTE_START` `STEP_START` `STEP_DONE` `STEP_FAILED` `UNDO_DONE` `UNDO_STEP_FAILED` `ROLLED_BACK` `UNDO_FAILED` `COMPLETED` `INTERRUPTED`
 - 상태 전환은 모두 "이 상태일 때만 바꾼다"는 조건부 업데이트로 한다. 버튼을 두 번 눌러도 한 번만 실행된다.
 
 ## 5. 역할
@@ -107,13 +110,19 @@ SQL: `supabase/migrations/20261026000000_create_agent_tasks.sql`. 서비스 롤 
 ```
 agent_architecture.md            이 문서
 api/
-  webhook.js                     지금은 echo. 스위치를 켜면 오케스트레이터로 연결
+  webhook.js                     스위치(AGENT_MODE)가 꺼져 있으면 echo, 켜져 있으면 approval.js로 연결
   _agents/
-    orchestrator.js              상태 전환과 결재 처리
-    registry.js                  도구·부서 등록 자리 (처음엔 비어 있음)
-    planner.js                   메인 에이전트 (뼈대: 가짜 계획)
-    checker.js                   크로스체크 (코드 검증 + 가짜 LLM 자리)
-    executor.js                  승인된 계획 실행·원복
+    approval.js                  텔레그램 입구: 새 지시 · [승인]/[반려] 버튼 · 반려 사유 답장
+    orchestrator.js              PLANNING→VALIDATING→PENDING/자동 승인, 남은 작업 정리
+    plan.js                      계획 해시 · 가짜 계획 작성기(메인 에이전트 자리) · 결재 요약
+    validator.js                 크로스체크(코드 검증): 등록 도구, 위험도 표기, 인자, 원복 정의, 5단계 한도
+    executor.js                  승인된 계획 실행 · 실패 시 역순 원복
+    registry.js                  도구·부서 레지스트리 (지금은 테스트 팀 도구 3개)
+    report.js                    텔레그램 문장 템플릿 (결재 요청·결과 보고·검증 실패·중단 알림)
+    rules.js                     규칙서 로더 (vercel.json includeFiles로 배포에 포함)
+    tasks.js / supabase.js       agent_tasks 읽기·조건부 전환·로그 추가
+    telegram.js                  텔레그램 호출 (메시지 번호 반환, force_reply)
+    testkit.js, *.test.js        가짜 Supabase·텔레그램과 자동 테스트
     rules/
       global_rules.md            전사 공통 규칙
       dept_template.md           부서별 규칙 템플릿
@@ -123,7 +132,16 @@ api/
 
 환경변수 `AGENT_MODE=on`일 때만 에이전트 경로가 동작한다. 기본은 꺼짐이며, 꺼져 있으면 지금처럼 echo 응답만 한다.
 
-1b 현재 `on` 상태의 동작(결재 테스트 모드): 봇에 보낸 글 → 가짜 계획의 `PENDING` 작업 + [승인][반려] 버튼 → 버튼 처리(`PENDING`일 때만, 만료 전, 계획 해시 일치일 때만 `APPROVED`/`REJECTED`). 실행은 연결되어 있지 않다.
+2단계 현재 `on` 상태의 동작(테스트 도구 모드): 지시 문구의 낱말로 가짜 계획을 고른다. 실제 데이터는 바뀌지 않는다.
+
+| 지시에 든 낱말 | 계획 | 흐름 |
+| --- | --- | --- |
+| "조회" | 테스트 조회(read) 1단계 | 결재 없이 바로 실행 → 완료 보고 |
+| (없음) | 테스트 쓰기(write) 1단계 | 결재 → 승인 시 실행 → 완료 보고 |
+| "실패" | 테스트 쓰기 → 실패하는 테스트 쓰기 | 결재 → 승인 → 2단계 실패 → 1단계 원복 → 실패 보고 |
+| "원복실패" | 위와 같되 원복도 실패 | 결재 → 승인 → 실패 → 원복 실패 경고 |
+
+반려하면 사유를 답장으로 받아 같은 작업을 다시 계획한다(사유에 위 낱말이 있으면 그 시나리오로 바뀐다).
 
 테스트: `npm run test:agents` (가짜 Supabase·텔레그램, 외부 패키지 없음)
 
@@ -132,13 +150,12 @@ api/
 | 단계 | 작업 | 완료 기준 |
 | --- | --- | --- |
 | 0 | 규칙서 3개 작성 | 문서 검토 완료 |
-| 1 | (1a) `agent_tasks` SQL — **Supabase 실행 완료** / (1b) **구현·자동 테스트 완료, 배포 후 실제 확인 대기:** 웹훅의 `callback_query` 수신과 `update_id` 중복 방지 | 가짜 입력으로 상태가 바뀌고 기존 echo는 그대로 |
-| 2 | 오케스트레이터 뼈대와 스위치 | 모의 텔레그램으로 지시→계획→검증→결재→실행→보고 전 경로, 반려·만료·중복 경로 테스트 통과 |
+| 1 | (1a) `agent_tasks` SQL — **Supabase 실행 완료** / (1b) 웹훅의 `callback_query` 수신과 `update_id` 중복 방지 — **배포·실제 확인 완료** | 가짜 입력으로 상태가 바뀌고 기존 echo는 그대로 |
+| 2 | 오케스트레이터 뼈대와 스위치 — **구현·자동 테스트 37개 통과, 배포 후 폰 확인 대기** | 모의 텔레그램으로 지시→계획→검증→결재→실행→보고 전 경로, 반려·만료·중복 경로 테스트 통과 |
 | 3 | 첫 부서·도구, 실제 LLM | 이번 범위 밖. 별도 승인 |
 
 ## 12. 열린 항목
 
-- 반려 사유 입력 방식, 만료된 `PENDING` 자동 정리 — 2단계에서 결정
 - 부서 이름과 권한 범위 (데이터를 채울 때 정한다)
 - Vercel 함수 실행 시간(`maxDuration`) — 실제 LLM을 붙이는 3단계에서 재검토
-- 규칙서 `.md`를 서버가 읽을 수 있도록 `vercel.json`에 포함 설정 추가 — 2단계에서 처리
+- 실행 중단(`INTERRUPTED`) 때의 원복은 사람 확인 후 수동. 실제 도구를 붙일 때 단계별 재개·원복 방식을 다시 검토

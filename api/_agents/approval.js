@@ -10,6 +10,7 @@ import {
   sweepStale,
 } from './orchestrator.js'
 import { hashPlan } from './plan.js'
+import { handleCommand, parseCommand } from './commands.js'
 import { friendlyReason } from './errors.js'
 import { REASON_PROMPT, approvalText, errorText } from './report.js'
 import { answerCallbackQuery, editMessageText, forceReply, sendMessage } from './telegram.js'
@@ -33,7 +34,7 @@ async function guard(chatId, work, { executing = false } = {}) {
   }
 }
 
-// 일반 메시지: (1) 남은 작업 정리 (2) 반려 사유 답장이면 재계획 (3) 아니면 새 지시
+// 일반 메시지: (1) 남은 작업 정리 (2) 운영 명령 (3) 반려 사유 답장이면 재계획 (4) 아니면 새 지시
 async function handleMessage(update) {
   const message = update.message
   const text = message.text?.trim()
@@ -51,6 +52,10 @@ async function routeMessage(update, text, chatId) {
   } catch (error) {
     console.error('[agents] 남은 작업 정리 실패', error)
   }
+
+  // 운영 명령(/help /pending /cancel)은 AI를 부르지 않고 바로 처리한다
+  const command = parseCommand(text)
+  if (command) return handleCommand(command, chatId)
 
   const replyTo = message.reply_to_message?.message_id
   if (replyTo != null) {

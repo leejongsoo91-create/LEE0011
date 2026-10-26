@@ -41,6 +41,13 @@ export async function startInstruction({ text, chatId, updateId }, options) {
 
 const stepCount = (plan) => plan?.steps?.length ?? 0
 
+// 프로그램이 돌려준 사용량(토큰)을 떼어 낸다. 사용량은 계획이 아니라 event_logs에 남긴다.
+function takeUsage(result) {
+  if (!result || typeof result !== 'object') return { result, usage: {} }
+  const { usage, ...rest } = result
+  return { result: rest, usage: usage ? { usage } : {} }
+}
+
 // PLANNING 상태 작업: 메인이 계획 → 코드 검사 → 크로스체크와 상의 → 결재 요청(쓰기·이견) 또는 바로 실행(읽기 전용).
 // planner·reviewer·clock은 테스트에서 바꿔 끼울 수 있다.
 export async function planAndRoute(task, chatId, { planner, reviewer, clock = Date.now } = {}) {
@@ -72,8 +79,9 @@ export async function planAndRoute(task, chatId, { planner, reviewer, clock = Da
 
   // 1) 메인: 첫 계획
   let plan
+  let usage
   try {
-    plan = await callMain(task.task_query, mainOptions({ previousPlan: task.plan_payload, round: 0 }))
+    ;({ result: plan, usage } = takeUsage(await callMain(task.task_query, mainOptions({ previousPlan: task.plan_payload, round: 0 }))))
   } catch (error) {
     console.error('[agents] 계획 작성 실패', error)
     await transition(task, 'FAILED', { log: { agent: 'main', event: 'PLAN_FAILED', note: String(error?.message ?? error).slice(0, 300) } })
@@ -83,13 +91,13 @@ export async function planAndRoute(task, chatId, { planner, reviewer, clock = Da
 
   // 메인이 되묻기로 답함 (모호하거나 할 수 없는 지시). 이 작업은 닫고, 캡틴이 내용을 보태 다시 보내게 한다.
   if (plan?.clarification) {
-    await transition(task, 'FAILED', { log: { agent: 'main', event: 'NEEDS_INFO', question: plan.clarification } })
+    await transition(task, 'FAILED', { log: { agent: 'main', event: 'NEEDS_INFO', question: plan.clarification, ...usage } })
     await sendMessage(chatId, clarificationText(task, plan.clarification))
     return 'needs-info'
   }
 
   let current = await transition(task, 'VALIDATING', {
-    log: { agent: 'main', event: 'PLANNED', program: mainCfg.program, steps: stepCount(plan), rules: status },
+    log: { agent: 'main', event: 'PLANNED', program: mainCfg.program, steps: stepCount(plan), rules: status, ...usage },
     patch: { plan_payload: plan, plan_hash: hashPlan(plan) },
   })
   if (!current) return 'already'
@@ -112,10 +120,11 @@ export async function planAndRoute(task, chatId, { planner, reviewer, clock = Da
       break
     }
     let opinion
+    let reviewUsage
     try {
-      opinion = normalizeOpinion(
-        await callReview({ query: task.task_query, plan, rules, round, model: checkCfg.model, timeoutMs: reviewTime }),
-      )
+      const raw = await callReview({ query: task.task_query, plan, rules, round, model: checkCfg.model, timeoutMs: reviewTime })
+      reviewUsage = raw?.usage ? { usage: raw.usage } : {}
+      opinion = normalizeOpinion(raw)
     } catch (error) {
       console.error('[agents] 크로스체크 실패', error)
       review.verdict = 'error'
@@ -125,12 +134,14 @@ export async function planAndRoute(task, chatId, { planner, reviewer, clock = Da
     }
     if (opinion.verdict === 'agree') {
       review.verdict = 'agreed'
-      current = (await appendLog(current, { agent: 'crosscheck', event: 'CROSSCHECK_AGREED', round })) ?? current
+      current = (await appendLog(current, { agent: 'crosscheck', event: 'CROSSCHECK_AGREED', round, ...reviewUsage })) ?? current
       break
     }
 
     review.comments = opinion.comments
-    current = (await appendLog(current, { agent: 'crosscheck', event: 'CROSSCHECK_OBJECTION', round, comments: opinion.comments })) ?? current
+    current =
+      (await appendLog(current, { agent: 'crosscheck', event: 'CROSSCHECK_OBJECTION', round, comments: opinion.comments, ...reviewUsage })) ??
+      current
     if (round >= CONSULT_MAX_ROUNDS) {
       review.verdict = 'unresolved'
       break
@@ -142,8 +153,11 @@ export async function planAndRoute(task, chatId, { planner, reviewer, clock = Da
 
     // 메인이 크로스체크 의견을 반영해 고친다
     let revised
+    let reviseUsage
     try {
-      revised = await callMain(task.task_query, mainOptions({ previousPlan: plan, review: opinion, round: round + 1 }))
+      ;({ result: revised, usage: reviseUsage } = takeUsage(
+        await callMain(task.task_query, mainOptions({ previousPlan: plan, review: opinion, round: round + 1 })),
+      ))
     } catch (error) {
       console.error('[agents] 계획 수정 실패', error)
       review.verdict = 'unresolved'
@@ -151,7 +165,7 @@ export async function planAndRoute(task, chatId, { planner, reviewer, clock = Da
       break
     }
     if (revised?.clarification) {
-      await transition(current, 'FAILED', { log: { agent: 'main', event: 'NEEDS_INFO', question: revised.clarification } })
+      await transition(current, 'FAILED', { log: { agent: 'main', event: 'NEEDS_INFO', question: revised.clarification, ...reviseUsage } })
       await sendMessage(chatId, clarificationText(task, revised.clarification))
       return 'needs-info'
     }
@@ -159,7 +173,7 @@ export async function planAndRoute(task, chatId, { planner, reviewer, clock = Da
     review.rounds = round + 1
     const next = await appendLog(
       current,
-      { agent: 'main', event: 'PLAN_REVISED', round: round + 1, steps: stepCount(plan) },
+      { agent: 'main', event: 'PLAN_REVISED', round: round + 1, steps: stepCount(plan), ...reviseUsage },
       { patch: { plan_payload: plan, plan_hash: hashPlan(plan) } },
     )
     if (!next) return 'already'

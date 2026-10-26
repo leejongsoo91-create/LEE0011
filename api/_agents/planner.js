@@ -150,6 +150,12 @@ export async function aiPlan(
     },
     timeoutMs ? { timeout: timeoutMs } : undefined,
   )
+  // 사용량(토큰): 오케스트레이터가 계획에서 떼어 event_logs에 남긴다 (계획·해시에는 들어가지 않음)
+  const usage = {
+    model,
+    input_tokens: response?.usage?.input_tokens ?? null,
+    output_tokens: response?.usage?.output_tokens ?? null,
+  }
   const call = response?.content?.find((block) => block.type === 'tool_use' && block.name === 'submit_plan')
   if (!call) {
     const text = (response?.content ?? [])
@@ -157,7 +163,7 @@ export async function aiPlan(
       .map((block) => block.text)
       .join('\n')
       .trim()
-    if (text) return { clarification: text.slice(0, 500) }
+    if (text) return { clarification: text.slice(0, 500), usage }
     throw new Error(`AI가 계획을 제출하지 않았습니다 (stop_reason: ${response?.stop_reason ?? '알 수 없음'})`)
   }
   const input = call.input ?? {}
@@ -165,7 +171,7 @@ export async function aiPlan(
   const summary = typeof input.summary === 'string' ? input.summary.slice(0, 500) : ''
 
   if (steps.length === 0) {
-    return { clarification: (input.clarification || summary || '지시를 이해하지 못했어요. 조금 더 구체적으로 보내 주세요.').slice(0, 500) }
+    return { clarification: (input.clarification || summary || '지시를 이해하지 못했어요. 조금 더 구체적으로 보내 주세요.').slice(0, 500), usage }
   }
   return {
     version: 3,
@@ -178,6 +184,7 @@ export async function aiPlan(
       return { tool: step?.tool, args: step?.args ?? {}, risk: tool?.risk ?? 'unknown', dept: tool?.dept ?? 'unknown' }
     }),
     ...(feedback ? { feedback } : {}),
+    usage,
   }
 }
 

@@ -59,6 +59,8 @@ PLANNING ──→ VALIDATING ──쓰기 있음──→ PENDING ──승인�
 - 쓰기 단계가 연결 끊김·5xx로 실패하면 저장됐는지 알 수 없으므로 원복 대상에 넣지 않고 `STEP_UNCERTAIN`으로 기록, 보고에 "⚠️ 확인 필요"를 붙인다.
 - 모든 `event_logs` 기록에는 `agent`(누가: `captain` `intake` `orchestrator` `main` `crosscheck` `executor`)가, 실행 단계 기록에는 `dept`(어느 부서)가 붙는다. 계획의 각 단계에도 `dept`가 있다(레지스트리 값, AI가 정하지 않음).
 - 상의(`VALIDATING` 안): 코드 검사 → 크로스체크 의견 → 이의면 메인이 고침(최대 2회) → 결과를 계획의 `review`(`off`·`agreed`·`unresolved`·`timeout`·`error`)에 붙여 결재. 이견·시간 부족·오류가 남으면 읽기 전용이어도 결재를 받는다. 시간 예산 기본 50초.
+- AI를 부를 때마다 사용량(`usage`: 모델, 입력·출력 토큰)을 그 기록(`PLANNED`, `PLAN_REVISED`, `NEEDS_INFO`, `CROSSCHECK_*`)에 남긴다. 계획(해시 대상)에는 넣지 않는다.
+- 운영 명령은 AI를 부르지 않는다(`commands.js`): `/help`(`/start`) 사용법·부서·지금 설정, `/pending` 대기 작업 목록과 버튼·답장 칸 다시 보내기, `/cancel` 결재·사유 대기 작업 모두 취소(실행 중은 그대로).
 - `event_logs`의 사건 이름: `CROSSCHECK_AGREED` `CROSSCHECK_OBJECTION` `CROSSCHECK_ERROR` `PLAN_REVISED` `PLAN_REVISE_FAILED` `CONFIG_ERROR` `CREATED` `NEEDS_INFO` `PLAN_FAILED` `STEP_UNCERTAIN` `PLANNED` `VALIDATED` `VALIDATION_FAILED` `AUTO_APPROVED` `APPROVED` `REJECTED` `REASON_REQUESTED` `REPLANNING` `CANCELLED` `REJECT_LIMIT` `REASON_TIMEOUT` `EXPIRED` `HASH_MISMATCH` `SEND_FAILED` `EXECUTE_START` `STEP_START` `STEP_DONE` `STEP_FAILED` `UNDO_DONE` `UNDO_STEP_FAILED` `ROLLED_BACK` `UNDO_FAILED` `COMPLETED` `INTERRUPTED`
 - 상태 전환은 모두 "이 상태일 때만 바꾼다"는 조건부 업데이트로 한다. 버튼을 두 번 눌러도 한 번만 실행된다.
 
@@ -117,7 +119,8 @@ agent_architecture.md            이 문서
 api/
   webhook.js                     스위치(AGENT_MODE)가 꺼져 있으면 echo, 켜져 있으면 approval.js로 연결
   _agents/
-    approval.js                  텔레그램 입구: 새 지시 · [승인]/[반려] 버튼 · 반려 사유 답장
+    approval.js                  텔레그램 입구: 새 지시 · [승인]/[반려] 버튼 · 반려 사유 답장 · 운영 명령 분기
+    commands.js                  운영 명령 /help /pending /cancel (AI 호출 없음)
     orchestrator.js              PLANNING→VALIDATING(상의)→PENDING/자동 승인, 시간 예산, 남은 작업 정리
     agents.config.js             역할별 설정: 메인·크로스체크 프로그램 자리, 모델, 시간 한도, 상의 횟수
     planner.js                   메인 에이전트: 프로그램(anthropic|test) 선택, Anthropic 계획 작성(규칙서·라우팅 자리·상의 반영)
@@ -169,6 +172,15 @@ api/
 
 역할별 프로그램(`agents.config.js`, Vercel 환경변수): `AGENT_PROGRAM_MAIN`(anthropic|test), `AGENT_MODEL_MAIN`, `AGENT_PROGRAM_CROSSCHECK`(off|test), `AGENT_MODEL_CROSSCHECK`, `AGENT_PLANNING_BUDGET_MS`. 상의 흐름 확인: `AGENT_PROGRAM_CROSSCHECK=test`로 두고 지시에 "이의 테스트"(한 번 이의 → 고친 뒤 동의) 또는 "이의 유지 테스트"(끝까지 이견)를 넣는다.
 
+사용량 합계 (SQL Editor):
+
+```sql
+select e->>'agent' as agent, e->'usage'->>'model' as model, count(*) as calls,
+       sum((e->'usage'->>'input_tokens')::int) as input_tokens, sum((e->'usage'->>'output_tokens')::int) as output_tokens
+from public.agent_tasks, jsonb_array_elements(event_logs) e
+where e ? 'usage' group by 1, 2 order by 1, 2;
+```
+
 테스트: `npm run test:agents` (가짜 Supabase·텔레그램, 외부 패키지 없음)
 
 ## 10-1. 역할 배정표
@@ -194,7 +206,7 @@ api/
 | 3 | 첫 부서(일정)·도구, 실제 LLM — **폰 확인 완료** | 자연어 지시 → AI 계획 → 결재 → 실제 일정 등록, 실패 시 삭제 원복 |
 | 뼈대 마무리 | 웹훅 시크릿 필수, 오류 알림·원인 한 줄, 확인 필요 표시, 문서 정리 — **구현·자동 테스트 64개 통과** | 위조 요청 무시, 오류가 텔레그램에 보임 |
 | 배정 준비(필수) | 부서 플러그인, 역할별 프로그램 자리, 작업 기록 agent·dept, 메인↔크로스체크 상의, 시간 예산 — **구현·자동 테스트 84개 통과** | 동작은 그대로, 상의는 `AGENT_PROGRAM_CROSSCHECK=test`로 확인 |
-| 배정 준비(권장) | AI 사용량 기록, 운영 명령 `/help` `/pending` `/cancel` | 다음 작업 |
+| 배정 준비(권장) | AI 사용량 기록, 운영 명령 `/help` `/pending` `/cancel` — **구현·자동 테스트 92개 통과** | 명령이 AI 없이 동작, 사용량이 기록에 남음 |
 | 4 | 일정 도래 시 자동 계획·결재 요청 (크론) | 별도 보고서·승인 |
 | 마지막 | 메인·크로스체크 프로그램 지정(캡틴) → 에이전트 프로그램 매칭을 결재로 | 캡틴 지정 후 |
 

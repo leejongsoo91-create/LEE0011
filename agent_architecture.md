@@ -30,29 +30,29 @@
 
 ## 4. 작업 상태 머신
 
-작업 하나는 `agent_tasks` 표의 한 줄이다.
+작업 하나는 `agent_tasks` 표의 한 줄이고, `status` 컬럼이 아래 8개 값 중 하나다.
 
 ```
- ┌────────── 누락·위험 발견: 캡틴에게 되묻기 ──────────┐
- ↓                                                      │
-계획 작성 ──→ 검증 ──통과──→ [결재 대기] ──승인──→ 실행 중 ──오류──→ 실패·원복
- ↑                              │  (30분 뒤 만료)          │
- └──── 반려: 피드백 담아 재계획 ─┘                          └──→ 완료
-        (최대 3회)
+PLANNING ──→ VALIDATING ──통과──→ PENDING ──승인──→ APPROVED ──→ EXECUTING ──→ COMPLETED
+   ↑  ↑            │                 │  │                              │
+   │  └─ 누락·위험 ┘ 되묻기          │  └─ 30분 경과(만료) ──→ FAILED ←── 오류·원복
+   │                                 │반려                              ↑
+   └──── 피드백 반영 ←──── REJECTED ←┘ ── 3회 초과 ─────────────────────┘
 ```
 
-| 상태 | 다음 상태 | 전환 조건 |
-| --- | --- | --- |
-| `planning` | `validating` | 초안 계획서 작성 완료 |
-| `validating` | `awaiting_approval` | 검증 통과 |
-| `validating` | `planning` | 누락·위험 발견 → 캡틴에게 되묻고 답을 받으면 재계획 |
-| `awaiting_approval` | `executing` | 캡틴이 [승인] |
-| `awaiting_approval` | `planning` | 캡틴이 [반려] (피드백 저장, 3회 초과 시 `failed`) |
-| `awaiting_approval` | `expired` | 30분 경과 |
-| `executing` | `done` | 모든 단계 성공 |
-| `executing` | `failed` | 오류 → 실행한 단계를 역순으로 원복 후 중단 |
+| 상태 | 의미 | 다음 상태 | 전환 조건 |
+| --- | --- | --- | --- |
+| `PLANNING` (기본값) | 초안 계획서 작성 중 | `VALIDATING` | 초안 완료 |
+| `VALIDATING` | 크로스체크 검증 중 | `PENDING` / `PLANNING` | 통과 / 누락·위험 발견 → 캡틴에게 되묻고 답을 받으면 재계획 |
+| `PENDING` | 결재 대기 (`expires_at`까지) | `APPROVED` / `REJECTED` / `FAILED` | [승인] / [반려] / 만료 |
+| `APPROVED` | 승인됨, 실행 전 | `EXECUTING` | 실행기가 `plan_hash`를 다시 확인한 뒤 시작 |
+| `REJECTED` | 반려됨, 피드백 저장 | `PLANNING` / `FAILED` | 재계획 / 반려 3회 초과 |
+| `EXECUTING` | 승인된 계획 실행 중 | `COMPLETED` / `FAILED` | 전 단계 성공 / 오류 → 실행한 단계를 역순으로 원복 |
+| `COMPLETED` | 완료 (끝) | 없음 | |
+| `FAILED` | 실패·원복 완료, 만료, 반려 3회 초과 (끝) | 없음 | 사유는 `event_logs`에 기록 |
 
-상태 전환은 모두 "이 상태일 때만 바꾼다"는 조건부 업데이트로 한다. 버튼을 두 번 눌러도 한 번만 실행된다.
+- 만료는 별도 상태 없이 `FAILED`로 처리하고, `event_logs`에 `EXPIRED` 사유를 남긴다.
+- 상태 전환은 모두 "이 상태일 때만 바꾼다"는 조건부 업데이트로 한다. 버튼을 두 번 눌러도 한 번만 실행된다.
 
 ## 5. 역할
 
@@ -83,8 +83,24 @@
 
 ## 8. 데이터 모델 (`agent_tasks`)
 
-작업 ID · 상태 · 지시 원문 · 계획(JSON) · 계획 해시 · 반려 피드백과 횟수 · 결과 · 이벤트 목록(JSON) · 텔레그램 메시지 ID와 `update_id` · 만료 시각 · 생성 시각.
-서비스 롤 키로만 접근한다(RLS 켜고 정책 없음).
+SQL: `supabase/migrations/20261026000000_create_agent_tasks.sql`. 서비스 롤 키로만 접근한다. (RLS는 켜고 정책은 만들지 않는다.)
+
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| `id` | uuid (PK) | 기본값 `gen_random_uuid()` |
+| `task_query` | text, NOT NULL | 캡틴의 원본 지시 |
+| `status` | text, NOT NULL | 위 8개 상태만 허용 (CHECK), 기본값 `PLANNING` |
+| `plan_payload` | jsonb, NOT NULL | 메인 에이전트의 계획 `{도구, 인자, 위험도}` 목록. JSON 객체만 허용, 기본값 `{}` |
+| `plan_hash` | text | 승인한 계획과 실행할 계획이 같은지 확인하는 해시 |
+| `feedback` | text | 반려 시 캡틴의 피드백 |
+| `reject_count` | integer, NOT NULL | 반려 횟수 (0 이상, 기본값 0) |
+| `event_logs` | jsonb, NOT NULL | 단계별 시각·결과 로그. JSON 배열만 허용, 기본값 `[]` |
+| `source_update_id` | bigint, UNIQUE | 지시를 보낸 텔레그램 `update_id`. 같은 메시지의 재전송으로 작업이 중복 생성되는 것을 막는다 |
+| `expires_at` | timestamptz | 결재 대기 만료 시각 |
+| `created_at` | timestamptz, NOT NULL | 기본값 `now()` |
+| `updated_at` | timestamptz, NOT NULL | 기본값 `now()`, 수정 시 트리거가 자동 갱신 |
+
+인덱스: `(status, created_at desc)`, `PENDING` 상태의 `expires_at`(만료 점검용 부분 인덱스).
 
 ## 9. 파일 구조
 
@@ -112,12 +128,13 @@ api/
 | 단계 | 작업 | 완료 기준 |
 | --- | --- | --- |
 | 0 | 규칙서 3개 작성 | 문서 검토 완료 |
-| 1 | `agent_tasks` SQL, 웹훅의 `callback_query` 수신과 `update_id` 중복 방지 | 가짜 입력으로 상태가 바뀌고 기존 echo는 그대로 |
+| 1 | (1a) `agent_tasks` SQL — **작성·검증 완료, Supabase 실행 대기** / (1b) 웹훅의 `callback_query` 수신과 `update_id` 중복 방지 | 가짜 입력으로 상태가 바뀌고 기존 echo는 그대로 |
 | 2 | 오케스트레이터 뼈대와 스위치 | 모의 텔레그램으로 지시→계획→검증→결재→실행→보고 전 경로, 반려·만료·중복 경로 테스트 통과 |
 | 3 | 첫 부서·도구, 실제 LLM | 이번 범위 밖. 별도 승인 |
 
 ## 12. 열린 항목
 
+- 1b 작업(웹훅 `callback_query`·중복 방지)은 별도 보고서로 승인 후 진행
 - 부서 이름과 권한 범위 (데이터를 채울 때 정한다)
 - Vercel 함수 실행 시간(`maxDuration`) — 실제 LLM을 붙이는 3단계에서 재검토
 - 규칙서 `.md`를 서버가 읽을 수 있도록 `vercel.json`에 포함 설정 추가 — 2단계에서 처리

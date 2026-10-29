@@ -7,9 +7,14 @@ import { deptName, getTool } from './registry.js'
 const MAX_QUERY_SHOWN = 300
 const TEST_NOTE = '🧪 테스트 도구만 쓰는 계획이라 실제 데이터는 바뀌지 않습니다.'
 const REAL_NOTE = '⚠️ 실제 대시보드 데이터가 바뀝니다. (실패하면 역순으로 원복)'
+const READ_NOTE = 'ℹ️ 조회만 하는 계획이라 대시보드 데이터는 바뀌지 않습니다.'
 
 // 계획이 실제 데이터를 건드리는지(테스트 팀 도구만 있는지)
 const onlyTestTools = (plan) => (plan?.steps ?? []).every((step) => getTool(step.tool)?.dept === 'test')
+// 읽기(read) 단계만 있는지. 모르는 도구나 risk가 없는 도구는 쓰기로 본다 (경고를 빼먹는 쪽이 더 위험하다)
+const onlyReadSteps = (plan) => (plan?.steps ?? []).every((step) => getTool(step.tool)?.risk === 'read')
+// 결재 요청 맨 끝에 붙는 데이터 변경 안내
+const dataNote = (plan) => (onlyTestTools(plan) ? TEST_NOTE : onlyReadSteps(plan) ? READ_NOTE : REAL_NOTE)
 // 누가 계획했는지 (메인 에이전트 프로그램)
 const plannerLine = (plan) =>
   plan?.main?.program === 'anthropic'
@@ -75,7 +80,7 @@ export function approvalText(task, rules) {
   lines.push(...[deptsLine(task.plan_payload), plannerLine(task.plan_payload), crosscheckLine(task.plan_payload)].filter(Boolean))
   if (rules) lines.push(rulesLine(rules))
   lines.push(`⏰ ${kst(task.expires_at)}까지 결정해 주세요 (30분 뒤 만료)`)
-  lines.push(onlyTestTools(task.plan_payload) ? TEST_NOTE : REAL_NOTE)
+  lines.push(dataNote(task.plan_payload))
   return lines.join('\n')
 }
 
@@ -130,8 +135,19 @@ export const errorText = (reason, { executing = false } = {}) =>
     ...(executing ? ['실행이 중간에 멈췄을 수 있어요. 2분 뒤 자동으로 정리되니, 대시보드에서 결과를 확인해 주세요.'] : []),
   ].join('\n')
 
+// 되묻기 끝 안내. 일정에서 자동으로 시작한 작업은 텔레그램 답장과 이어지지 않으므로, 일정 문장을 고치라고 안내한다.
+const clarificationTail = (task) => {
+  const origin = scheduleOrigin(task)
+  if (!origin) return ['내용을 보태서 지시를 다시 보내 주세요.']
+  return [
+    '이 작업은 대시보드 일정에 적은 문장이 짧아서 무엇을 할지 알 수 없어요.',
+    `• 다음부터: 대시보드에서 '${origin.title}' 일정의 🤖 에이전트 작업 문장을 구체적으로 고쳐 주세요. (예: 오늘 일정 알려줘)`,
+    '• 이번에 바로 하려면: 텔레그램으로 지시를 직접 보내 주세요.',
+  ]
+}
+
 export const clarificationText = (task, question) =>
-  [...scheduleHeader(task), '❓ 계획을 세우기 전에 확인이 필요해요', `지시: ${queryOf(task)}`, '', question, '', '내용을 보태서 지시를 다시 보내 주세요.'].join('\n')
+  [...scheduleHeader(task), '❓ 계획을 세우기 전에 확인이 필요해요', `지시: ${queryOf(task)}`, '', question, '', ...clarificationTail(task)].join('\n')
 
 export const validationFailedText = (task, errors) =>
   [...scheduleHeader(task), '🚫 계획 검증 실패 — 결재 요청을 보내지 않았어요', `지시: ${queryOf(task)}`, '', ...errors.map((e) => `• ${e}`)].join('\n')

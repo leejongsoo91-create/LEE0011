@@ -116,11 +116,14 @@ export async function callWebhook(handler, { method = 'POST', body, headers = { 
 // reply가 함수면 요청(params)을 받아 입력을 만든다. 오류 객체면 그 오류를 던진다.
 export function fakeAnthropic(reply) {
   const calls = []
+  const options = [] // 요청마다 넘긴 두 번째 인자(시간 한도·재시도 설정)
   return {
     calls,
+    options,
     messages: {
-      create: async (params) => {
+      create: async (params, requestOptions) => {
         calls.push(params)
+        options.push(requestOptions)
         const input = typeof reply === 'function' ? reply(params) : reply
         if (input instanceof Error) throw input
         if (typeof input === 'string') return { stop_reason: 'end_turn', content: [{ type: 'text', text: input }] }

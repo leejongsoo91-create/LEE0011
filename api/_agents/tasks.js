@@ -56,7 +56,7 @@ export async function appendLog(task, entries, { patch = {} } = {}) {
 
 // 아직 끝나지 않은 작업(결재 대기·반려 사유 대기·실행 중). 만료·중단 정리에 쓴다.
 export async function listOpenTasks() {
-  return (await rest(`${TABLE}?status=in.(PENDING,REJECTED,EXECUTING)&select=*`)) ?? []
+  return (await rest(`${TABLE}?status=in.(PLANNING,VALIDATING,PENDING,REJECTED,EXECUTING)&select=*`)) ?? []
 }
 
 // 반려 사유를 묻는 메시지(messageId)에 단 답장이 어느 작업의 것인지 찾는다. 세션 표 없이 event_logs로 찾는다.

@@ -64,7 +64,7 @@ export function buildSystemPrompt(rules, now = new Date(), deptIds = routeDepart
     '- "내일", "다음 주 금요일", "오후 3시" 같은 상대 표현은 위 현재 시각 기준으로 YYYY-MM-DD, HH:MM(24시간제)로 바꾼다.',
     '- 값이 모호해서 정할 수 없으면 추측하지 말고 steps를 빈 배열로, clarification에 캡틴에게 물을 질문 한 문장을 적는다.',
     '- 할 수 없는 요청(도구가 없는 일)도 steps를 빈 배열로 두고 clarification에 무엇이 안 되는지 적는다.',
-    '- summary에는 계획을 한국어 한두 문장으로 요약하고, 상대 표현을 어떻게 해석했는지 적는다. (예: "내일 3시 → 10/28(수) 15:00")',
+    '- summary에는 계획을 한국어 한두 문장으로 요약하고, 상대 표현을 어떻게 해석했는지 적는다. (예: "내일 오후 3시 → 내일 날짜(요일) 15:00")',
     '- 반려 사유가 주어지면 그것을 반영해 다시 계획하고, summary에 무엇을 바꿨는지 적는다.',
     '- 크로스체크 에이전트의 의견이 주어지면 타당한 부분을 반영해 계획을 고치고, summary에 무엇을 바꿨는지(또는 왜 그대로 두었는지) 적는다.',
     '- 계획은 최대 5단계.',
@@ -84,7 +84,7 @@ export function buildSystemPrompt(rules, now = new Date(), deptIds = routeDepart
 export function submitPlanTool(deptIds = routeDepartments()) {
   return {
     name: 'submit_plan',
-    description: '실행 계획을 제출한다. 반드시 한 번 호출한다.',
+    description: '실행 계획이나 되물을 질문을 이 도구로 한 번 제출한다.',
     input_schema: {
       type: 'object',
       properties: {
@@ -148,7 +148,8 @@ export async function aiPlan(
       tool_choice: { type: 'auto' },
       messages: [{ role: 'user', content: buildUserMessage(query, { feedback, previousPlan, review }) }],
     },
-    timeoutMs ? { timeout: timeoutMs } : undefined,
+    // 시간 한도가 있는 호출은 자동 재시도를 끈다. 재시도하면 한도의 두 배가 걸려 Vercel 함수 시간(60초)을 넘길 수 있다.
+    timeoutMs ? { timeout: timeoutMs, maxRetries: 0 } : undefined,
   )
   // 사용량(토큰): 오케스트레이터가 계획에서 떼어 event_logs에 남긴다 (계획·해시에는 들어가지 않음)
   const usage = {

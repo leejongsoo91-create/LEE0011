@@ -14,7 +14,7 @@ import { friendlyReason } from './errors.js'
 import { executePlan } from './executor.js'
 import { hashPlan } from './plan.js'
 import { mainProgram } from './planner.js'
-import { approvalButtons, approvalText, clarificationText, executionReport, interruptedText, validationFailedText } from './report.js'
+import { approvalButtons, approvalText, clarificationText, executionReport, interruptedText, stalledText, validationFailedText } from './report.js'
 import { loadRules, rulesStatus } from './rules.js'
 import { sendMessage } from './telegram.js'
 import { appendLog, createTask, lastLogAt, listOpenTasks, transition } from './tasks.js'
@@ -23,6 +23,8 @@ import { validatePlan } from './validator.js'
 export const APPROVAL_TTL_MS = 30 * 60 * 1000
 export const REASON_TTL_MS = 30 * 60 * 1000
 export const STALE_EXECUTION_MS = 2 * 60 * 1000
+// 계획 단계(PLANNING·VALIDATING)는 정상이면 60초 안에 끝난다. 5분 넘게 기록이 없으면 함수가 중간에 끊긴 것으로 본다.
+export const STALE_PLANNING_MS = 5 * 60 * 1000
 export const MAX_REJECTS = 3
 
 // 새 지시 → 작업 만들기 → 계획·검증·결재 요청
@@ -219,6 +221,7 @@ export async function runApproved(task, chatId, rules) {
 
 // 크론 없이, 봇에 메시지가 올 때마다 남은 작업을 정리한다.
 //   EXECUTING 2분 넘게 기록 없음 → FAILED(INTERRUPTED) + 알림 (자동 원복은 하지 않음)
+//   PLANNING·VALIDATING 5분 넘게 기록 없음 → FAILED(STALLED) + 알림 (계획 단계라 실행된 것은 없음)
 //   PENDING 만료 → FAILED(EXPIRED) · REJECTED 사유 30분 무응답 → FAILED(REASON_TIMEOUT)
 export async function sweepStale(chatId, now = Date.now()) {
   const rows = await listOpenTasks()
@@ -229,6 +232,14 @@ export async function sweepStale(chatId, now = Date.now()) {
       if (failed) {
         closed.push('interrupted')
         await sendMessage(chatId, interruptedText(failed))
+      }
+    } else if ((task.status === 'PLANNING' || task.status === 'VALIDATING') && now - lastLogAt(task) > STALE_PLANNING_MS) {
+      const failed = await transition(task, 'FAILED', {
+        log: { agent: 'orchestrator', event: 'STALLED', note: `${task.status} 단계에서 5분 넘게 멈춰 있음` },
+      })
+      if (failed) {
+        closed.push('stalled')
+        await sendMessage(chatId, stalledText(failed))
       }
     } else if (task.status === 'PENDING' && task.expires_at && Date.parse(task.expires_at) <= now) {
       if (await transition(task, 'FAILED', { log: { agent: 'orchestrator', event: 'EXPIRED', note: '결재 대기 시간(30분) 초과' } })) closed.push('expired')

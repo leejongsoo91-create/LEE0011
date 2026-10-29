@@ -132,5 +132,13 @@ export function interruptedText(task) {
   ].join('\n')
 }
 
+// 계획을 세우다 멈춘 작업 (함수가 시간 한도로 끊긴 경우 등)
+export const stalledText = (task) =>
+  [
+    '⚠️ 계획을 세우다 멈춘 작업을 정리했어요',
+    `지시: ${queryOf(task)}`,
+    '실행된 것은 없어요. 필요하면 지시를 다시 보내 주세요.',
+  ].join('\n')
+
 export const REASON_PROMPT =
   '✍️ 반려 사유를 이 메시지에 "답장"으로 적어 주세요.\n사유를 반영해 다시 계획합니다. "취소"라고 답하면 작업을 끝냅니다.'

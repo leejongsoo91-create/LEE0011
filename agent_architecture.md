@@ -43,8 +43,8 @@ PLANNING ──→ VALIDATING ──쓰기 있음──→ PENDING ──승인�
 
 | 상태 | 의미 | 다음 상태 | 전환 조건 |
 | --- | --- | --- | --- |
-| `PLANNING` (기본값) | 초안 계획서 작성 중 | `VALIDATING` | 초안 완료 |
-| `VALIDATING` | 크로스체크 검증 중 | `PENDING` / `APPROVED` / `FAILED` | 쓰기 단계가 있으면 결재 대기 / 읽기 전용이면 자동 승인(`AUTO_APPROVED`) / 검증 실패. (되묻기는 3단계 AI 계획에서) |
+| `PLANNING` (기본값) | 초안 계획서 작성 중 | `VALIDATING` / `FAILED` | 초안 완료 / 5분 넘게 기록 없음 → `STALLED`(알림, 실행된 것 없음) |
+| `VALIDATING` | 크로스체크 검증 중 | `PENDING` / `APPROVED` / `FAILED` | 쓰기 단계가 있으면 결재 대기 / 읽기 전용이면 자동 승인(`AUTO_APPROVED`) / 검증 실패, 5분 넘게 기록 없음(`STALLED`). (되묻기는 3단계 AI 계획에서) |
 | `PENDING` | 결재 대기 (`expires_at`까지) | `APPROVED` / `REJECTED` / `FAILED` | [승인] / [반려] / 만료 |
 | `APPROVED` | 승인됨, 실행 전 | `EXECUTING` | 실행기가 `plan_hash`를 다시 확인한 뒤 시작 |
 | `REJECTED` | 반려됨, 사유 답장 대기 | `PLANNING` / `FAILED` | 사유 답장 → `feedback` 저장 후 재계획 / "취소" 답장, 반려 4번째(3회 초과), 30분 무응답 |
@@ -61,7 +61,7 @@ PLANNING ──→ VALIDATING ──쓰기 있음──→ PENDING ──승인�
 - 상의(`VALIDATING` 안): 코드 검사 → 크로스체크 의견 → 이의면 메인이 고침(최대 2회) → 결과를 계획의 `review`(`off`·`agreed`·`unresolved`·`timeout`·`error`)에 붙여 결재. 이견·시간 부족·오류가 남으면 읽기 전용이어도 결재를 받는다. 시간 예산 기본 50초.
 - AI를 부를 때마다 사용량(`usage`: 모델, 입력·출력 토큰)을 그 기록(`PLANNED`, `PLAN_REVISED`, `NEEDS_INFO`, `CROSSCHECK_*`)에 남긴다. 계획(해시 대상)에는 넣지 않는다.
 - 운영 명령은 AI를 부르지 않는다(`commands.js`): `/help`(`/start`) 사용법·부서·지금 설정, `/pending` 대기 작업 목록과 버튼·답장 칸 다시 보내기, `/cancel` 결재·사유 대기 작업 모두 취소(실행 중은 그대로).
-- `event_logs`의 사건 이름: `CROSSCHECK_AGREED` `CROSSCHECK_OBJECTION` `CROSSCHECK_ERROR` `PLAN_REVISED` `PLAN_REVISE_FAILED` `CONFIG_ERROR` `CREATED` `NEEDS_INFO` `PLAN_FAILED` `STEP_UNCERTAIN` `PLANNED` `VALIDATED` `VALIDATION_FAILED` `AUTO_APPROVED` `APPROVED` `REJECTED` `REASON_REQUESTED` `REPLANNING` `CANCELLED` `REJECT_LIMIT` `REASON_TIMEOUT` `EXPIRED` `HASH_MISMATCH` `SEND_FAILED` `EXECUTE_START` `STEP_START` `STEP_DONE` `STEP_FAILED` `UNDO_DONE` `UNDO_STEP_FAILED` `ROLLED_BACK` `UNDO_FAILED` `COMPLETED` `INTERRUPTED`
+- `event_logs`의 사건 이름: `CROSSCHECK_AGREED` `CROSSCHECK_OBJECTION` `CROSSCHECK_ERROR` `PLAN_REVISED` `PLAN_REVISE_FAILED` `CONFIG_ERROR` `CREATED` `NEEDS_INFO` `PLAN_FAILED` `STEP_UNCERTAIN` `PLANNED` `VALIDATED` `VALIDATION_FAILED` `AUTO_APPROVED` `APPROVED` `REJECTED` `REASON_REQUESTED` `REPLANNING` `CANCELLED` `REJECT_LIMIT` `REASON_TIMEOUT` `EXPIRED` `HASH_MISMATCH` `SEND_FAILED` `EXECUTE_START` `STEP_START` `STEP_DONE` `STEP_FAILED` `UNDO_DONE` `UNDO_STEP_FAILED` `ROLLED_BACK` `UNDO_FAILED` `COMPLETED` `INTERRUPTED` `STALLED`
 - 상태 전환은 모두 "이 상태일 때만 바꾼다"는 조건부 업데이트로 한다. 버튼을 두 번 눌러도 한 번만 실행된다.
 
 ## 5. 역할
@@ -168,7 +168,7 @@ api/
 - 모호하면 AI가 되묻고(`NEEDS_INFO`), 작업은 닫힌다. 캡틴이 내용을 보태 다시 보낸다.
 - 일정 도구는 모든 조회·등록·삭제에 주인 `user_id` 조건을 코드가 붙인다.
 - 롤백 확인: 지시에 "실패 테스트"를 넣으면 AI가 `test.fail_write`를 마지막 단계로 붙인다 → 등록한 일정이 삭제(원복)된다.
-- 웹훅 함수 최대 실행 시간 60초(`vercel.json`). 계획·상의는 시간 예산 50초 안에서, 메인 호출은 최대 30초, 크로스체크 호출은 최대 15초.
+- 웹훅 함수 최대 실행 시간 60초(`vercel.json`). 계획·상의는 시간 예산 50초 안에서, 메인 호출은 최대 30초, 크로스체크 호출은 최대 15초. 시간 한도가 있는 AI 호출은 자동 재시도를 끈다(`maxRetries: 0`, 재시도하면 한도의 두 배가 걸려 함수 시간을 넘길 수 있음). 그래도 함수가 끊겨 PLANNING·VALIDATING에 남은 작업은 다음 메시지 때 5분 기준으로 정리한다.
 
 역할별 프로그램(`agents.config.js`, Vercel 환경변수): `AGENT_PROGRAM_MAIN`(anthropic|test), `AGENT_MODEL_MAIN`, `AGENT_PROGRAM_CROSSCHECK`(off|test), `AGENT_MODEL_CROSSCHECK`, `AGENT_PLANNING_BUDGET_MS`. 상의 흐름 확인: `AGENT_PROGRAM_CROSSCHECK=test`로 두고 지시에 "이의 테스트"(한 번 이의 → 고친 뒤 동의) 또는 "이의 유지 테스트"(끝까지 이견)를 넣는다.
 

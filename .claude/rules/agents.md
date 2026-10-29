@@ -7,7 +7,7 @@ paths:
 
 설계 전체는 `agent_architecture.md`, 에이전트가 따르는 규칙은 `api/_agents/rules/global_rules.md`.
 
-## 반드시 지킬 것
+## 지킬 것
 
 - 작업 상태(`agent_tasks.status`)는 `tasks.transition()`의 **조건부 업데이트**(지금 이 상태일 때만)로만 바꾼다. 상태를 직접 PATCH하지 않는다.
 - `event_logs`의 모든 기록에 `agent`(captain · intake · orchestrator · main · crosscheck · executor)를 남긴다. 실행 단계 기록에는 `dept`.
@@ -16,7 +16,7 @@ paths:
 - 실행은 코드만 한다. AI(메인·크로스체크)는 계획과 의견만 낸다.
 - 일정 등 실제 데이터 도구는 모든 쿼리에 주인 `user_id` 조건을 붙인다 (`owner.js`).
 - 웹훅은 처리 결과와 상관없이 200을 돌려준다. `AGENT_MODE=on`이면 `TELEGRAM_WEBHOOK_SECRET` 확인이 필수다.
-- 오류는 텔레그램에 원인 한 줄(`errors.js`)로 알리고, 키·토큰은 절대 넣지 않는다.
+- 오류는 텔레그램에 원인 한 줄(`errors.js`)로 알리고, 키·토큰은 넣지 않는다.
 - 결재는 최종 계획 전체(`plan_hash`)에 묶인다. 계획 내용이 바뀌면 다시 결재.
 
 ## 구조

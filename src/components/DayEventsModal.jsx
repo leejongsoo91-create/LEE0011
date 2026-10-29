@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Plus, X } from 'lucide-react'
+import { Bot, Plus, X } from 'lucide-react'
 import useRows from '../hooks/useRows.js'
 import { openAddModal, openScheduleView } from '../utils/itemEditor.js'
 import { formatKoreanDate } from '../utils/dateFormat.js'
@@ -50,6 +50,7 @@ export default function DayEventsModal({ date, onClose }) {
               >
                 <span className="w-12 shrink-0 tabular-nums text-xs text-gray-400">{row.time ? row.time.slice(0, 5) : '종일'}</span>
                 <span className="min-w-0 flex-1 break-words">{row.title || '제목 없음'}</span>
+                {row.agent_task && <Bot className="h-4 w-4 shrink-0 self-center text-indigo-300" aria-label="에이전트 작업 있음" />}
               </button>
             </li>
           ))}

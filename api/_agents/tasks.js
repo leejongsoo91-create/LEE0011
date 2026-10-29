@@ -8,14 +8,18 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export const isTaskId = (value) => UUID.test(value ?? '')
 
-// 새 작업을 만든다. 같은 source_update_id가 이미 있으면(텔레그램 재전송) 만들지 않고 null을 돌려준다.
-export async function createTask({ query, sourceUpdateId, status, plan = {}, planHash = null, expiresAt = null, log }) {
-  const rows = await rest(`${TABLE}?on_conflict=source_update_id`, {
+// 새 작업을 만든다. 같은 키가 이미 있으면 만들지 않고 null을 돌려준다.
+//   sourceUpdateId: 텔레그램 update_id (같은 메시지 재전송)
+//   sourceKey     : 일정 자동 작업 키 schedule:<일정 id>:<날짜>T<시각> (크론 호출이 겹침)
+export async function createTask({ query, sourceUpdateId, sourceKey, status, plan = {}, planHash = null, expiresAt = null, log }) {
+  const conflict = sourceKey ? 'source_key' : 'source_update_id'
+  const rows = await rest(`${TABLE}?on_conflict=${conflict}`, {
     method: 'POST',
     prefer: 'resolution=ignore-duplicates,return=representation',
     body: {
       task_query: query,
       source_update_id: sourceUpdateId,
+      ...(sourceKey ? { source_key: sourceKey } : {}),
       status,
       plan_payload: plan,
       plan_hash: planHash,
@@ -70,3 +74,11 @@ export async function findAwaitingReason(messageId) {
 }
 
 export const lastLogAt = (task) => Date.parse(task.event_logs?.at(-1)?.at ?? task.updated_at ?? task.created_at)
+
+// 이미 만든 자동 작업 키 (크론이 같은 일정으로 다시 만들지 않게 미리 거른다)
+export async function existingSourceKeys(keys) {
+  if (keys.length === 0) return new Set()
+  const list = keys.map((key) => `"${key}"`).join(',')
+  const rows = (await rest(`${TABLE}?select=source_key&source_key=in.(${encodeURIComponent(list)})`)) ?? []
+  return new Set(rows.map((row) => row.source_key))
+}

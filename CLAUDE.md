@@ -17,7 +17,7 @@
 | 위치 | 내용 |
 | --- | --- |
 | `src/` | 대시보드 화면 (pages, components, hooks, lib, utils) |
-| `api/` | Vercel 함수: `webhook.js`(텔레그램 입구), `send-reminders.js`·`notify-schedule.js`(일정 알림) |
+| `api/` | Vercel 함수: `webhook.js`(텔레그램 입구), `agent-cron.js`(일정 자동 작업 크론), `send-reminders.js`·`notify-schedule.js`(일정 알림) |
 | `api/_agents/` | 멀티 에이전트 (오케스트레이터, 메인·크로스체크, 실행기, 부서 `depts/`, 규칙서 `rules/`) |
 | `supabase/migrations/` | SQL. 사용자가 Supabase SQL Editor에서 직접 실행한다 |
 | `agent_architecture.md` | 에이전트 설계 문서 (상태 머신, 역할, 파일 구조, 단계별 계획) |

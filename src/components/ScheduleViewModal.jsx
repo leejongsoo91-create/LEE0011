@@ -39,6 +39,9 @@ export default function ScheduleViewModal({ row, onClose }) {
   const details = [
     { label: '날짜', value: formatKoreanDate(row.date) },
     { label: '시간', value: formatKoreanTime(row.time) },
+    ...(row.agent_task
+      ? [{ label: '에이전트', value: `${row.agent_task} (${row.agent_before_min ? `${row.agent_before_min}분 전` : '정시'}에 결재 요청)` }]
+      : []),
   ]
 
   return (
@@ -73,8 +76,8 @@ export default function ScheduleViewModal({ row, onClose }) {
         <dl className="flex flex-col gap-3 text-sm">
           {details.map(({ label, value }) => (
             <div key={label} className="flex items-baseline gap-4 border-t border-gray-700 pt-3">
-              <dt className="w-10 shrink-0 text-gray-400">{label}</dt>
-              <dd className="text-gray-100">{value}</dd>
+              <dt className="w-14 shrink-0 text-gray-400">{label}</dt>
+              <dd className="min-w-0 break-words text-gray-100">{value}</dd>
             </div>
           ))}
         </dl>

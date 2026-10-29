@@ -1,7 +1,7 @@
 import Skeleton from './Skeleton.jsx'
 import EmptyState from './EmptyState.jsx'
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Bot, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import useRowDelete from '../hooks/useRowDelete.js'
 import useRows from '../hooks/useRows.js'
 import useDoubleTap from '../hooks/useDoubleTap.js'
@@ -90,6 +90,7 @@ export default function CalendarGrid() {
                   className="flex cursor-pointer items-center gap-0.5 rounded bg-indigo-500/20 px-1 text-[10px] text-indigo-300 lg:text-xs"
                 >
                   <span className="min-w-0 flex-1 truncate">
+                    {row.agent_task && <Bot className="mr-0.5 inline h-2.5 w-2.5 lg:h-3 lg:w-3" aria-label="에이전트 작업 있음" />}
                     {row.time && <span className="mr-1 text-indigo-200/70">{row.time.slice(0, 5)}</span>}
                     {row.title || '제목 없음'}
                   </span>

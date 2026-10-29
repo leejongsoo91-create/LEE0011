@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { insertRow, notifyDataChange, updateRow } from '../lib/db.js'
 import { notifyScheduleAdded } from '../lib/notify.js'
+import { agentColumns } from '../utils/scheduleForm.js'
 
 // 현재 페이지(경로)에 따라 항목이 저장될 테이블
 const tableByPath = {
@@ -27,16 +28,19 @@ function buildValues(table, { title, schedule, content, investment }) {
   // 시간을 정하지 않은 일정은 종일 일정이라 알림도 없다.
   // (시간 칸이 없는 일정은 새 컬럼을 보내지 않아, 데이터베이스 업데이트 전에도 저장된다.)
   if (!schedule.time) return { title, date: schedule.date }
+  const agent = agentColumns(schedule)
   return {
     title,
     date: schedule.date,
     time: schedule.time,
     remind_before_min: schedule.remind === '' ? null : Number(schedule.remind),
+    // 에이전트 작업이 있을 때만 새 칸을 보낸다 (4단계 SQL 실행 전에도 일반 일정은 그대로 저장되게)
+    ...(agent.agent_task ? agent : {}),
   }
 }
 
 // 일정의 시간·알림 컬럼은 나중에 추가된 것이라, 데이터베이스에 아직 없을 수 있다.
-const optionalColumns = ['remind_before_min', 'time', 'reminded_at']
+const optionalColumns = ['remind_before_min', 'time', 'reminded_at', 'agent_task', 'agent_before_min']
 
 // 저장(추가 또는 수정)을 실행한다. 데이터베이스에 없는 선택 컬럼 때문에 거절되면
 // 그 값만 빼고 다시 저장하고, 빠진 컬럼 이름을 함께 돌려줘서 안내할 수 있게 한다.
@@ -70,12 +74,16 @@ function buildScheduleUpdate(row, schedule, title) {
       row.date !== schedule.date || (row.time ? row.time.slice(0, 5) : null) !== time || (row.remind_before_min ?? null) !== remind
     if (changed) values.reminded_at = null
   }
+  // 에이전트 작업: 쓰거나, 원래 있던 것을 지울 때만 보낸다
+  const agent = agentColumns(schedule)
+  if (agent.agent_task || row.agent_task) Object.assign(values, agent)
   return values
 }
 
 // 빠진 컬럼에 맞는 안내 문구 (일정은 저장됐지만 일부 값은 저장되지 않았다는 뜻)
 function describeDropped(dropped) {
   if (dropped.includes('time')) return '일정은 저장됐지만 시간은 저장되지 않았어요. Supabase의 schedule 테이블에 time 컬럼이 필요해요'
+  if (dropped.includes('agent_task')) return '일정은 저장됐지만 에이전트 작업은 저장되지 않았어요. Supabase에서 4단계 SQL(20261030000000)을 실행해 주세요'
   return '일정은 저장됐지만 알림 설정은 저장되지 않았어요. Supabase에서 알림용 SQL(remind_before_min 컬럼)을 실행해 주세요'
 }
 

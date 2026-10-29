@@ -44,7 +44,7 @@ PLANNING ──→ VALIDATING ──쓰기 있음──→ PENDING ──승인�
 | 상태 | 의미 | 다음 상태 | 전환 조건 |
 | --- | --- | --- | --- |
 | `PLANNING` (기본값) | 초안 계획서 작성 중 | `VALIDATING` / `FAILED` | 초안 완료 / 5분 넘게 기록 없음 → `STALLED`(알림, 실행된 것 없음) |
-| `VALIDATING` | 크로스체크 검증 중 | `PENDING` / `APPROVED` / `FAILED` | 쓰기 단계가 있으면 결재 대기 / 읽기 전용이면 자동 승인(`AUTO_APPROVED`) / 검증 실패, 5분 넘게 기록 없음(`STALLED`). (되묻기는 3단계 AI 계획에서) |
+| `VALIDATING` | 크로스체크 검증 중 | `PENDING` / `APPROVED` / `FAILED` | 쓰기 단계가 있으면 결재 대기 / 읽기 전용이면 자동 승인(`AUTO_APPROVED`, 일정 자동 작업은 제외 — 항상 결재) / 검증 실패, 5분 넘게 기록 없음(`STALLED`). (되묻기는 3단계 AI 계획에서) |
 | `PENDING` | 결재 대기 (`expires_at`까지) | `APPROVED` / `REJECTED` / `FAILED` | [승인] / [반려] / 만료 |
 | `APPROVED` | 승인됨, 실행 전 | `EXECUTING` | 실행기가 `plan_hash`를 다시 확인한 뒤 시작 |
 | `REJECTED` | 반려됨, 사유 답장 대기 | `PLANNING` / `FAILED` | 사유 답장 → `feedback` 저장 후 재계획 / "취소" 답장, 반려 4번째(3회 초과), 30분 무응답 |
@@ -53,7 +53,7 @@ PLANNING ──→ VALIDATING ──쓰기 있음──→ PENDING ──승인�
 | `FAILED` | 실패·원복 완료, 만료, 반려 3회 초과 (끝) | 없음 | 사유는 `event_logs`에 기록 |
 
 - 만료는 별도 상태 없이 `FAILED`로 처리하고, `event_logs`에 `EXPIRED` 사유를 남긴다.
-- 크론은 쓰지 않는다. 봇에 메시지가 올 때마다 남은 작업(만료된 `PENDING`, 30분 넘은 `REJECTED`, 2분 넘게 멈춘 `EXECUTING`)을 정리한다.
+- 봇에 메시지가 올 때마다, 그리고 4단계부터는 크론(`/api/agent-cron`, 1분마다)이 남은 작업(만료된 `PENDING`, 30분 넘은 `REJECTED`, 2분 넘게 멈춘 `EXECUTING`, 5분 넘게 멈춘 `PLANNING`·`VALIDATING`)을 정리한다.
 - 반려 사유는 봇이 보낸 `force_reply` 메시지에 단 답장으로 받는다. 그 메시지 번호를 `event_logs`의 `REASON_REQUESTED`에 적어 두어 세션 표 없이 작업을 찾는다.
 - 오류는 서버 로그에만 두지 않고 텔레그램에 "원인 한 줄"로 알린다(`errors.js`). 키·토큰 같은 비밀 값은 넣지 않는다.
 - 쓰기 단계가 연결 끊김·5xx로 실패하면 저장됐는지 알 수 없으므로 원복 대상에 넣지 않고 `STEP_UNCERTAIN`으로 기록, 보고에 "⚠️ 확인 필요"를 붙인다.
@@ -61,7 +61,7 @@ PLANNING ──→ VALIDATING ──쓰기 있음──→ PENDING ──승인�
 - 상의(`VALIDATING` 안): 코드 검사 → 크로스체크 의견 → 이의면 메인이 고침(최대 2회) → 결과를 계획의 `review`(`off`·`agreed`·`unresolved`·`timeout`·`error`)에 붙여 결재. 이견·시간 부족·오류가 남으면 읽기 전용이어도 결재를 받는다. 시간 예산 기본 50초.
 - AI를 부를 때마다 사용량(`usage`: 모델, 입력·출력 토큰)을 그 기록(`PLANNED`, `PLAN_REVISED`, `NEEDS_INFO`, `CROSSCHECK_*`)에 남긴다. 계획(해시 대상)에는 넣지 않는다.
 - 운영 명령은 AI를 부르지 않는다(`commands.js`): `/help`(`/start`) 사용법·부서·지금 설정, `/pending` 대기 작업 목록과 버튼·답장 칸 다시 보내기, `/cancel` 결재·사유 대기 작업 모두 취소(실행 중은 그대로).
-- `event_logs`의 사건 이름: `CROSSCHECK_AGREED` `CROSSCHECK_OBJECTION` `CROSSCHECK_ERROR` `PLAN_REVISED` `PLAN_REVISE_FAILED` `CONFIG_ERROR` `CREATED` `NEEDS_INFO` `PLAN_FAILED` `STEP_UNCERTAIN` `PLANNED` `VALIDATED` `VALIDATION_FAILED` `AUTO_APPROVED` `APPROVED` `REJECTED` `REASON_REQUESTED` `REPLANNING` `CANCELLED` `REJECT_LIMIT` `REASON_TIMEOUT` `EXPIRED` `HASH_MISMATCH` `SEND_FAILED` `EXECUTE_START` `STEP_START` `STEP_DONE` `STEP_FAILED` `UNDO_DONE` `UNDO_STEP_FAILED` `ROLLED_BACK` `UNDO_FAILED` `COMPLETED` `INTERRUPTED` `STALLED`
+- `event_logs`의 사건 이름: `CROSSCHECK_AGREED` `CROSSCHECK_OBJECTION` `CROSSCHECK_ERROR` `PLAN_REVISED` `PLAN_REVISE_FAILED` `CONFIG_ERROR` `CREATED` `NEEDS_INFO` `PLAN_FAILED` `STEP_UNCERTAIN` `PLANNED` `VALIDATED` `VALIDATION_FAILED` `AUTO_APPROVED` `APPROVED` `REJECTED` `REASON_REQUESTED` `REPLANNING` `CANCELLED` `REJECT_LIMIT` `REASON_TIMEOUT` `EXPIRED` `HASH_MISMATCH` `SEND_FAILED` `EXECUTE_START` `STEP_START` `STEP_DONE` `STEP_FAILED` `UNDO_DONE` `UNDO_STEP_FAILED` `ROLLED_BACK` `UNDO_FAILED` `COMPLETED` `INTERRUPTED` `STALLED` `MISSED`
 - 상태 전환은 모두 "이 상태일 때만 바꾼다"는 조건부 업데이트로 한다. 버튼을 두 번 눌러도 한 번만 실행된다.
 
 ## 5. 역할
@@ -106,6 +106,7 @@ SQL: `supabase/migrations/20261026000000_create_agent_tasks.sql`. 서비스 롤 
 | `reject_count` | integer, NOT NULL | 반려 횟수 (0 이상, 기본값 0) |
 | `event_logs` | jsonb, NOT NULL | 단계별 시각·결과 로그. JSON 배열만 허용, 기본값 `[]` |
 | `source_update_id` | bigint, UNIQUE | 지시를 보낸 텔레그램 `update_id`. 같은 메시지의 재전송으로 작업이 중복 생성되는 것을 막는다 |
+| `source_key` | text, UNIQUE | 일정 자동 작업 키 `schedule:<일정 id>:<날짜>T<시각>`. 크론 호출이 겹쳐도 한 번만 만든다 (4단계 SQL `20261030000000`) |
 | `expires_at` | timestamptz | 결재 대기 만료 시각 |
 | `created_at` | timestamptz, NOT NULL | 기본값 `now()` |
 | `updated_at` | timestamptz, NOT NULL | 기본값 `now()`, 수정 시 트리거가 자동 갱신 |
@@ -118,10 +119,12 @@ SQL: `supabase/migrations/20261026000000_create_agent_tasks.sql`. 서비스 롤 
 agent_architecture.md            이 문서
 api/
   webhook.js                     스위치(AGENT_MODE)가 꺼져 있으면 echo, 켜져 있으면 approval.js로 연결
+  agent-cron.js                  일정 자동 작업 크론 입구 (pg_cron 1분마다, CRON_SECRET 검증 → 남은 작업 정리 → 자동 작업 1개)
   _agents/
     approval.js                  텔레그램 입구: 새 지시 · [승인]/[반려] 버튼 · 반려 사유 답장 · 운영 명령 분기
     commands.js                  운영 명령 /help /pending /cancel (AI 호출 없음)
     orchestrator.js              PLANNING→VALIDATING(상의)→PENDING/자동 승인, 시간 예산, 남은 작업 정리
+    scheduleTrigger.js           일정 자동 작업: 때가 된 일정 찾기, source_key, 놓친 작업(MISSED), planAndRoute 호출
     agents.config.js             역할별 설정: 메인·크로스체크 프로그램 자리, 모델, 시간 한도, 상의 횟수
     planner.js                   메인 에이전트: 프로그램(anthropic|test) 선택, Anthropic 계획 작성(규칙서·라우팅 자리·상의 반영)
     crosscheck.js                크로스체크 에이전트: 프로그램(off|test) 선택, 의견 형식 정리
@@ -207,7 +210,7 @@ where e ? 'usage' group by 1, 2 order by 1, 2;
 | 뼈대 마무리 | 웹훅 시크릿 필수, 오류 알림·원인 한 줄, 확인 필요 표시, 문서 정리 — **구현·자동 테스트 64개 통과** | 위조 요청 무시, 오류가 텔레그램에 보임 |
 | 배정 준비(필수) | 부서 플러그인, 역할별 프로그램 자리, 작업 기록 agent·dept, 메인↔크로스체크 상의, 시간 예산 — **구현·자동 테스트 84개 통과** | 동작은 그대로, 상의는 `AGENT_PROGRAM_CROSSCHECK=test`로 확인 |
 | 배정 준비(권장) | AI 사용량 기록, 운영 명령 `/help` `/pending` `/cancel` — **구현·자동 테스트 92개 통과** | 명령이 AI 없이 동작, 사용량이 기록에 남음 |
-| 4 | 일정 도래 시 자동 계획·결재 요청 (크론) | 별도 보고서·승인 |
+| 4 | 일정 도래 시 자동 계획·결재 요청 (pg_cron → `/api/agent-cron`, 크론 호출 시크릿 검증, 일정 입력 "에이전트 작업" 칸) — **구현·자동 테스트 106개 통과** | 일정 10분 전에 🔔 결재 요청이 오고, 승인하면 실행, 같은 일정으로 두 번 오지 않음 |
 | 마지막 | 메인·크로스체크 프로그램 지정(캡틴) → 에이전트 프로그램 매칭을 결재로 | 캡틴 지정 후 |
 
 ## 12. 열린 항목

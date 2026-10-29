@@ -14,7 +14,7 @@ import { friendlyReason } from './errors.js'
 import { executePlan } from './executor.js'
 import { hashPlan } from './plan.js'
 import { mainProgram } from './planner.js'
-import { approvalButtons, approvalText, clarificationText, executionReport, interruptedText, stalledText, validationFailedText } from './report.js'
+import { approvalButtons, approvalText, clarificationText, scheduleHeader, executionReport, interruptedText, stalledText, validationFailedText } from './report.js'
 import { loadRules, rulesStatus } from './rules.js'
 import { sendMessage } from './telegram.js'
 import { appendLog, createTask, lastLogAt, listOpenTasks, transition } from './tasks.js'
@@ -87,7 +87,7 @@ export async function planAndRoute(task, chatId, { planner, reviewer, clock = Da
   } catch (error) {
     console.error('[agents] 계획 작성 실패', error)
     await transition(task, 'FAILED', { log: { agent: 'main', event: 'PLAN_FAILED', note: String(error?.message ?? error).slice(0, 300) } })
-    await sendMessage(chatId, `🚫 계획을 만들지 못했어요\n원인: ${friendlyReason(error)}\n지시: ${task.task_query}`)
+    await sendMessage(chatId, [...scheduleHeader(task), `🚫 계획을 만들지 못했어요\n원인: ${friendlyReason(error)}\n지시: ${task.task_query}`].join('\n'))
     return 'plan-failed'
   }
 
@@ -188,7 +188,9 @@ export async function planAndRoute(task, chatId, { planner, reviewer, clock = Da
   const disagreed = ['unresolved', 'timeout', 'error'].includes(review.verdict)
 
   // 읽기 전용이고 이견이 없으면 결재 생략. 상태 머신은 그대로 밟고, 로그에 AUTO_APPROVED를 남긴다.
-  if (!verdict.needsApproval && !disagreed) {
+  // 단, 일정에서 자동으로 시작한 작업(source_key 있음)은 캡틴이 보낸 지시가 아니므로 항상 결재한다. (G-9)
+  const scheduled = Boolean(task.source_key)
+  if (!verdict.needsApproval && !disagreed && !scheduled) {
     const approved = await transition(current, 'APPROVED', {
       log: { agent: 'orchestrator', event: 'AUTO_APPROVED', note: '읽기 전용 계획' },
       patch: finalPatch,

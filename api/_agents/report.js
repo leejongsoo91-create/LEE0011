@@ -52,8 +52,23 @@ const rulesLine = (status) =>
     `부서 템플릿 ${mark(status?.deptTemplate)}`,
   ].join(' · ')
 
+// 일정에서 자동으로 시작한 작업이면 맨 위에 붙는 알림 줄 (작업을 만들 때 CREATED 기록의 origin에 남긴다)
+const scheduleOrigin = (task) => {
+  const origin = task?.event_logs?.[0]?.origin
+  return origin?.kind === 'schedule' ? origin : null
+}
+export function scheduleHeader(task, { ask = false } = {}) {
+  const origin = scheduleOrigin(task)
+  if (!origin) return []
+  return [
+    `🔔 [스케줄 자동 알림] '${origin.title}' 일정(${origin.when})이 다가와요.`,
+    ...(ask ? ['계획된 작업을 실행할까요?'] : []),
+    '',
+  ]
+}
+
 export function approvalText(task, rules) {
-  const lines = ['📝 [결재 요청]', `지시: ${queryOf(task)}`]
+  const lines = [...scheduleHeader(task, { ask: true }), '📝 [결재 요청]', `지시: ${queryOf(task)}`]
   if (task.reject_count > 0) lines.push(`🔁 재계획 ${task.reject_count}회차 · 반려 사유: ${task.feedback ?? '(없음)'}`)
   if (task.plan_payload?.summary) lines.push(`요약: ${task.plan_payload.summary}`)
   lines.push('', '계획:', describePlan(task.plan_payload), '')
@@ -116,10 +131,10 @@ export const errorText = (reason, { executing = false } = {}) =>
   ].join('\n')
 
 export const clarificationText = (task, question) =>
-  ['❓ 계획을 세우기 전에 확인이 필요해요', `지시: ${queryOf(task)}`, '', question, '', '내용을 보태서 지시를 다시 보내 주세요.'].join('\n')
+  [...scheduleHeader(task), '❓ 계획을 세우기 전에 확인이 필요해요', `지시: ${queryOf(task)}`, '', question, '', '내용을 보태서 지시를 다시 보내 주세요.'].join('\n')
 
 export const validationFailedText = (task, errors) =>
-  ['🚫 계획 검증 실패 — 결재 요청을 보내지 않았어요', `지시: ${queryOf(task)}`, '', ...errors.map((e) => `• ${e}`)].join('\n')
+  [...scheduleHeader(task), '🚫 계획 검증 실패 — 결재 요청을 보내지 않았어요', `지시: ${queryOf(task)}`, '', ...errors.map((e) => `• ${e}`)].join('\n')
 
 export function interruptedText(task) {
   const last = [...(task.event_logs ?? [])].reverse().find((entry) => entry.step)
@@ -131,6 +146,14 @@ export function interruptedText(task) {
     '자동으로 되돌리지 않았어요. 어디까지 실행됐는지 확인해 주세요.',
   ].join('\n')
 }
+
+// 일정 시각이 30분 넘게 지나서야 발견한 자동 작업 (계획하지 않음)
+export const missedText = (task) =>
+  [
+    `⏭️ 놓친 자동 작업이 있어요: '${scheduleOrigin(task)?.title ?? ''}' 일정(${scheduleOrigin(task)?.when ?? ''})`,
+    `지시: ${queryOf(task)}`,
+    '일정 시각이 30분 넘게 지나서 계획하지 않았어요. 필요하면 텔레그램으로 직접 지시해 주세요.',
+  ].join('\n')
 
 // 계획을 세우다 멈춘 작업 (함수가 시간 한도로 끊긴 경우 등)
 export const stalledText = (task) =>

@@ -53,7 +53,10 @@ export function installFakes({ mode = 'on' } = {}) {
     const filters = [...address.searchParams]
       .filter(([, value]) => /^(eq|gte|lte)\./.test(value) || value.startsWith('in.('))
       .map(([key, value]) => {
-        if (value.startsWith('in.(')) return (row) => value.slice(4, -1).split(',').includes(String(row[key]))
+        if (value.startsWith('in.(')) {
+          const list = value.slice(4, -1).split(',').map((item) => item.replace(/^"(.*)"$/, '$1'))
+          return (row) => list.includes(String(row[key]))
+        }
         const [op, ...rest] = value.split('.')
         const target = rest.join('.')
         if (op === 'gte') return (row) => String(row[key]) >= target
@@ -69,7 +72,9 @@ export function installFakes({ mode = 'on' } = {}) {
         table.push(row)
         return json([structuredClone(row)], 201)
       }
-      if (table.some((row) => row.source_update_id === body.source_update_id)) return json([])
+      // 중복 키(source_update_id·source_key)는 PostgREST ignore-duplicates처럼 빈 배열
+      const same = (column) => body[column] != null && table.some((row) => row[column] === body[column])
+      if (same('source_update_id') || same('source_key')) return json([])
       const row = { id: randomUUID(), reject_count: 0, feedback: null, created_at: new Date().toISOString(), ...body }
       table.push(row)
       return json([structuredClone(row)], 201)

@@ -18,8 +18,8 @@ export function installFakes({ mode = 'on' } = {}) {
   if (mode) process.env.AGENT_MODE = mode
   else delete process.env.AGENT_MODE
 
-  const tables = { agent_tasks: [], schedule: [] }
-  const fake = { tables, tasks: tables.agent_tasks, schedule: tables.schedule, users: [{ id: OWNER_UID }], sent: [], edits: [], answers: [], dbCalls: 0, failDb: false, failTelegram: false, failScheduleInsert: false }
+  const tables = { agent_tasks: [], schedule: [], agent_settings: [] }
+  const fake = { tables, tasks: tables.agent_tasks, schedule: tables.schedule, users: [{ id: OWNER_UID }], sent: [], edits: [], answers: [], dbCalls: 0, failDb: false, failTelegram: false, failScheduleInsert: false, failSettingsWrite: false }
   let nextMessageId = 500
   const json = (body, status = 200) => new Response(JSON.stringify(body), { status })
 
@@ -66,6 +66,14 @@ export function installFakes({ mode = 'on' } = {}) {
     const matches = (row) => filters.every((test) => test(row))
 
     if (method === 'POST') {
+      // agent_settings: 한 줄(id=1) 합치기 저장 (PostgREST의 on_conflict=id, resolution=merge-duplicates)
+      if (table === tables.agent_settings) {
+        if (fake.failSettingsWrite) return json({ message: 'settings write failed' }, 500)
+        const existing = table.find((row) => row.id === body.id)
+        if (existing) Object.assign(existing, body)
+        else table.push({ ...body })
+        return json([structuredClone(table.find((row) => row.id === body.id))], 201)
+      }
       if (table === tables.schedule) {
         if (fake.failScheduleInsert) return json({ message: 'insert failed' }, 500)
         const row = { id: randomUUID(), created_at: new Date().toISOString(), ...body }
@@ -118,8 +126,9 @@ export async function callWebhook(handler, { method = 'POST', body, headers = { 
 }
 
 // 가짜 Anthropic 클라이언트: messages.create가 정해 둔 submit_plan 입력을 돌려준다.
+// (크로스체크 의견은 toolName 'submit_opinion'으로 돌려주도록 fakeAnthropic(reply, { toolName })을 쓴다)
 // reply가 함수면 요청(params)을 받아 입력을 만든다. 오류 객체면 그 오류를 던진다.
-export function fakeAnthropic(reply) {
+export function fakeAnthropic(reply, { toolName = 'submit_plan' } = {}) {
   const calls = []
   const options = [] // 요청마다 넘긴 두 번째 인자(시간 한도·재시도 설정)
   return {
@@ -132,7 +141,7 @@ export function fakeAnthropic(reply) {
         const input = typeof reply === 'function' ? reply(params) : reply
         if (input instanceof Error) throw input
         if (typeof input === 'string') return { stop_reason: 'end_turn', content: [{ type: 'text', text: input }] }
-        return { stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'submit_plan', id: 'tu_1', input }] }
+        return { stop_reason: 'tool_use', content: [{ type: 'tool_use', name: toolName, id: 'tu_1', input }] }
       },
     },
   }

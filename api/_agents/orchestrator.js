@@ -8,7 +8,8 @@
 //
 // event_logs의 모든 기록에 agent(누가)를 남긴다: intake · orchestrator · main · crosscheck · executor · captain
 
-import { CONSULT_MAX_ROUNDS, MIN_CALL_MS, SEND_RESERVE_MS, planningBudgetMs, roleConfig } from './agents.config.js'
+import { CONSULT_MAX_ROUNDS, MIN_CALL_MS, SEND_RESERVE_MS, matchingSummary, planningBudgetMs, roleConfig } from './agents.config.js'
+import { loadSettings } from './settings.js'
 import { crosscheckProgram, normalizeOpinion } from './crosscheck.js'
 import { friendlyReason } from './errors.js'
 import { executePlan } from './executor.js'
@@ -55,8 +56,10 @@ function takeUsage(result) {
 export async function planAndRoute(task, chatId, { planner, reviewer, clock = Date.now } = {}) {
   const rules = loadRules()
   const status = rulesStatus(rules)
-  const mainCfg = roleConfig('main')
-  const checkCfg = roleConfig('crosscheck')
+  // 매칭: 텔레그램 결재로 바꾼 저장값 → Vercel 환경변수 → 기본값 순서 (저장값을 못 읽으면 환경변수)
+  const settings = await loadSettings()
+  const mainCfg = roleConfig('main', process.env, settings)
+  const checkCfg = roleConfig('crosscheck', process.env, settings)
   // 설정된 프로그램 이름이 등록돼 있는지 먼저 확인 (틀렸으면 작업이 PLANNING에 멈추지 않게 닫는다)
   let callMain
   let callReview
@@ -65,7 +68,7 @@ export async function planAndRoute(task, chatId, { planner, reviewer, clock = Da
     callReview = reviewer === undefined ? crosscheckProgram(checkCfg.program) : reviewer
   } catch (error) {
     await transition(task, 'FAILED', { log: { agent: 'orchestrator', event: 'CONFIG_ERROR', note: error.message } })
-    await sendMessage(chatId, `⚙️ 에이전트 설정 오류: ${error.message}\nVercel 환경변수(AGENT_PROGRAM_…)를 확인해 주세요.`)
+    await sendMessage(chatId, `⚙️ 에이전트 설정 오류: ${error.message}\n매칭 설정(저장값 또는 Vercel 환경변수 AGENT_PROGRAM_…)을 확인해 주세요.`)
     return 'config-error'
   }
   const deadline = clock() + planningBudgetMs()
@@ -75,6 +78,7 @@ export async function planAndRoute(task, chatId, { planner, reviewer, clock = Da
     feedback: task.feedback ?? undefined,
     rules,
     model: mainCfg.model,
+    matching: matchingSummary(mainCfg, checkCfg),
     timeoutMs: timeFor(mainCfg),
     ...extra,
   })

@@ -18,7 +18,7 @@ beforeEach(() => {
 const send = (text) => handleUpdate(message(text, { updateId: updateId++ }))
 
 test('부서 플러그인: depts/index.js 목록으로 부서·도구가 만들어지고, 도구마다 dept가 붙는다', () => {
-  assert.deepEqual(DEPARTMENTS.map((d) => d.id), ['schedule', 'test'])
+  assert.deepEqual(DEPARTMENTS.map((d) => d.id), ['schedule', 'agents', 'test'])
   assert.deepEqual(departments.schedule.tools, ['schedule.list', 'schedule.create'])
   assert.equal(tools['schedule.create'].dept, 'schedule')
   assert.equal(tools['test.fail_write'].dept, 'test')
@@ -39,7 +39,7 @@ test('부서 규칙서: 부서 폴더의 rules.md를 읽고, 상태도 부서 �
   const rules = loadRules()
   assert.match(rules.depts.schedule, /# 일정 부서 규칙/)
   assert.equal(rules.depts.test, undefined, '규칙서가 없는 부서는 빠진다')
-  assert.deepEqual(rulesStatus(rules), { global: true, deptTemplate: true, depts: { schedule: true } })
+  assert.deepEqual(rulesStatus(rules), { global: true, deptTemplate: true, depts: { schedule: true, agents: true } })
   const vercel = JSON.parse(readFileSync(new URL('../../vercel.json', import.meta.url), 'utf8'))
   assert.equal(vercel.functions['api/webhook.js'].includeFiles, 'api/_agents/**/*.md')
 })

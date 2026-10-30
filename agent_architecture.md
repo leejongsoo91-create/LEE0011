@@ -1,8 +1,8 @@
 # 결재 통제형 멀티 에이전트 시스템 — 아키텍처
 
 > 상태: **뼈대 완료 + 배정 준비 필수 정리** (부서 플러그인 구조, 역할별 프로그램 자리, 메인↔크로스체크 상의, 시간 예산, 작업 기록의 agent·dept)
-> 계획서: 「멀티 에이전트 뼈대 구축 계획서」, 「에이전트 배정 전 점검 보고서」 / 규칙서: `api/_agents/rules/global_rules.md`, `api/_agents/rules/dept_template.md`, `api/_agents/depts/schedule/rules.md`
-> 에이전트 프로그램 매칭은 맨 마지막: 메인이 크로스체크와 상의해 매칭안을 결재로 올린다. 메인·크로스체크의 프로그램은 캡틴이 정한다.
+> 계획서: 「멀티 에이전트 뼈대 구축 계획서」, 「에이전트 배정 전 점검 보고서」 / 규칙서: `api/_agents/rules/global_rules.md`, `api/_agents/rules/dept_template.md`, `api/_agents/depts/schedule/rules.md`, `api/_agents/depts/agents/rules.md`
+> 에이전트 프로그램 매칭(5단계): 텔레그램에 "메인을 Opus 5.5로 바꿔줘"처럼 요청하면 에이전트 설정 부서가 매칭 변경 계획을 세우고, 크로스체크와 상의한 뒤 결재로 올린다. 승인하면 `agent_settings` 표에 저장되어 다음 작업부터 적용된다. 메인·크로스체크의 프로그램은 캡틴이 정한다.
 
 ## 1. 목표
 
@@ -125,9 +125,10 @@ api/
     commands.js                  운영 명령 /help /pending /cancel (AI 호출 없음)
     orchestrator.js              PLANNING→VALIDATING(상의)→PENDING/자동 승인, 시간 예산, 남은 작업 정리
     scheduleTrigger.js           일정 자동 작업: 때가 된 일정 찾기, source_key, 놓친 작업(MISSED), planAndRoute 호출
-    agents.config.js             역할별 설정: 메인·크로스체크 프로그램 자리, 모델, 시간 한도, 상의 횟수
+    agents.config.js             역할별 설정: 메인·크로스체크 프로그램 자리, 모델, 시간 한도, 상의 횟수. 순서: 저장값(agent_settings) → 환경변수 → 기본값
+    settings.js                  agent_settings(한 줄) 읽기·저장, 고를 수 있는 프로그램·모델 허용 목록
     planner.js                   메인 에이전트: 프로그램(anthropic|test) 선택, Anthropic 계획 작성(규칙서·라우팅 자리·상의 반영)
-    crosscheck.js                크로스체크 에이전트: 프로그램(off|test) 선택, 의견 형식 정리
+    crosscheck.js                크로스체크 에이전트: 프로그램(off|test|anthropic) 선택, 의견 형식 정리, Anthropic 검토 프로그램
     plan.js                      계획 해시 · 테스트 계획 작성기(낱말 시나리오) · 결재 요약
     owner.js                     대시보드 주인 user_id (AGENT_USER_ID 또는 Auth 사용자 1명 자동)
     validator.js                 크로스체크의 코드 검사: 등록 도구, 위험도·부서 표기, 인자, 원복 정의, 5단계 한도
@@ -173,7 +174,7 @@ api/
 - 롤백 확인: 지시에 "실패 테스트"를 넣으면 AI가 `test.fail_write`를 마지막 단계로 붙인다 → 등록한 일정이 삭제(원복)된다.
 - 웹훅 함수 최대 실행 시간 60초(`vercel.json`). 계획·상의는 시간 예산 50초 안에서, 메인 호출은 최대 30초, 크로스체크 호출은 최대 15초. 시간 한도가 있는 AI 호출은 자동 재시도를 끈다(`maxRetries: 0`, 재시도하면 한도의 두 배가 걸려 함수 시간을 넘길 수 있음). 그래도 함수가 끊겨 PLANNING·VALIDATING에 남은 작업은 다음 메시지 때 5분 기준으로 정리한다.
 
-역할별 프로그램(`agents.config.js`, Vercel 환경변수): `AGENT_PROGRAM_MAIN`(anthropic|test), `AGENT_MODEL_MAIN`, `AGENT_PROGRAM_CROSSCHECK`(off|test), `AGENT_MODEL_CROSSCHECK`, `AGENT_PLANNING_BUDGET_MS`. 상의 흐름 확인: `AGENT_PROGRAM_CROSSCHECK=test`로 두고 지시에 "이의 테스트"(한 번 이의 → 고친 뒤 동의) 또는 "이의 유지 테스트"(끝까지 이견)를 넣는다.
+역할별 프로그램(`agents.config.js`): 5단계부터는 텔레그램 결재로 바꾼 저장값(`agent_settings`)이 먼저이고, 비어 있는 칸은 Vercel 환경변수 `AGENT_PROGRAM_MAIN`(anthropic|test), `AGENT_MODEL_MAIN`, `AGENT_PROGRAM_CROSSCHECK`(off|test|anthropic), `AGENT_MODEL_CROSSCHECK`을 쓴다. 그 밖의 시간 설정: `AGENT_PLANNING_BUDGET_MS`. 상의 흐름 확인: `AGENT_PROGRAM_CROSSCHECK=test`로 두고 지시에 "이의 테스트"(한 번 이의 → 고친 뒤 동의) 또는 "이의 유지 테스트"(끝까지 이견)를 넣는다.
 
 사용량 합계 (SQL Editor):
 
@@ -193,7 +194,7 @@ where e ? 'usage' group by 1, 2 order by 1, 2;
 | 입구(접수) | `webhook.js`, `approval.js` | 텔레그램 수신, 시크릿·주인 확인, 새 지시·버튼·반려 사유 분배, 오류 알림 | 계획·실행 | 코드 |
 | 오케스트레이터 | `orchestrator.js` | 상태 전환, 계획→검증→결재/자동 승인 분기, 남은 작업 정리 | 도구 직접 실행 | 코드 |
 | 메인 에이전트(계획) | `planner.js` (테스트용 `plan.js`) | 규칙서에 맞는 JSON 계획, 모호하면 되묻기, 크로스체크 의견 반영 | 실행, 위험도·부서 결정 | **프로그램 자리** (지금 Anthropic) |
-| 크로스체크(검증·상의) | `validator.js`(코드 검사), `crosscheck.js`(에이전트) | 규칙 검사, 계획에 의견·이의 | 계획 직접 수정 | 코드 + **프로그램 자리** (지금 꺼짐) |
+| 크로스체크(검증·상의) | `validator.js`(코드 검사), `crosscheck.js`(에이전트) | 규칙 검사, 계획에 의견·이의 | 계획 직접 수정 | 코드 + **프로그램 자리** (꺼짐·테스트·Anthropic 중 결재로 선택, 처음은 꺼짐) |
 | 실무 에이전트(실행) | `executor.js` | 승인된 계획 실행, 역순 원복, 확인 필요 표시 | 계획에 없는 도구 호출 | 코드 |
 | 부서(도구·규칙) | `depts/<부서>/`, `registry.js` | 부서별 도구와 원복, 부서 규칙 | 다른 부서 데이터 | 코드 |
 | 보고 | `report.js`, `errors.js` | 결재 요청·결과·오류 문장 | 결과에 없는 내용 | 코드 |
@@ -211,7 +212,7 @@ where e ? 'usage' group by 1, 2 order by 1, 2;
 | 배정 준비(필수) | 부서 플러그인, 역할별 프로그램 자리, 작업 기록 agent·dept, 메인↔크로스체크 상의, 시간 예산 — **구현·자동 테스트 84개 통과** | 동작은 그대로, 상의는 `AGENT_PROGRAM_CROSSCHECK=test`로 확인 |
 | 배정 준비(권장) | AI 사용량 기록, 운영 명령 `/help` `/pending` `/cancel` — **구현·자동 테스트 92개 통과** | 명령이 AI 없이 동작, 사용량이 기록에 남음 |
 | 4 | 일정 도래 시 자동 계획·결재 요청 (pg_cron → `/api/agent-cron`, 크론 호출 시크릿 검증, 일정 입력 "에이전트 작업" 칸) — **완료**: 자동 테스트 110개 통과, 실제 환경(10/30)에서 🔔 알림 → 결재 → 승인 → 일정 조회 완료 확인. 안내 문구 3건(되묻기·규칙 번호·데이터 변경 경고) 정리 | 일정 10분 전에 🔔 결재 요청이 오고, 승인하면 실행, 같은 일정으로 두 번 오지 않음 |
-| 마지막 | 메인·크로스체크 프로그램 지정(캡틴) → 에이전트 프로그램 매칭을 결재로 | 캡틴 지정 후 |
+| 5 (마지막) | 에이전트 프로그램 매칭을 결재로: 에이전트 설정 부서(`agents.set_matching`), `agent_settings` 표(SQL `20261031000000`), Anthropic 크로스체크 프로그램 — **구현·자동 테스트 완료**, 실제 확인은 SQL 실행 후 | 텔레그램으로 "메인을 Opus 5.5로 바꿔줘" → 결재 → ✅ → `/help`에 반영, 같은 방법으로 원복 |
 
 ## 12. 열린 항목
 

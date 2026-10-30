@@ -3,7 +3,8 @@
 //   /pending        결재 대기·반려 사유 대기·실행 중인 작업 목록. 결재 대기는 버튼을, 사유 대기는 답장 칸을 다시 보낸다
 //   /cancel         결재 대기·반려 사유 대기 작업을 모두 취소 (실행 중인 작업은 멈출 수 없어 그대로)
 
-import { roleConfig } from './agents.config.js'
+import { matchingSummary, roleConfig } from './agents.config.js'
+import { loadSettings } from './settings.js'
 import { departments } from './registry.js'
 import { REASON_PROMPT, approvalButtons, approvalText, kst } from './report.js'
 import { loadRules, rulesStatus } from './rules.js'
@@ -18,13 +19,8 @@ export function parseCommand(text) {
   return match ? match[1].toLowerCase() : null
 }
 
-const programLabel = (cfg) => {
-  if (cfg.program === 'off') return '꺼짐 (코드 검사만)'
-  if (cfg.program === 'test') return '테스트용'
-  return cfg.model ? `${cfg.program} (${cfg.model})` : cfg.program
-}
-
-export function helpText() {
+// settings: 저장된 매칭(settings.js의 loadSettings). 없으면 환경변수 기본값만 보여 준다.
+export function helpText(settings = {}) {
   const real = Object.values(departments).filter((dept) => dept.id !== 'test')
   return [
     '🤖 결재 통제형 에이전트 사용법',
@@ -39,7 +35,7 @@ export function helpText() {
     '/cancel — 대기 중인 작업 모두 취소',
     '/help — 이 안내',
     '',
-    `지금 설정: 메인 ${programLabel(roleConfig('main'))} · 크로스체크 ${programLabel(roleConfig('crosscheck'))}`,
+    `지금 설정: ${matchingSummary(roleConfig('main', process.env, settings), roleConfig('crosscheck', process.env, settings))}`,
   ].join('\n')
 }
 
@@ -93,11 +89,11 @@ async function cancelAll(chatId) {
 
 export async function handleCommand(command, chatId) {
   if (command === 'help' || command === 'start') {
-    await sendMessage(chatId, helpText())
+    await sendMessage(chatId, helpText(await loadSettings()))
     return 'help'
   }
   if (command === 'pending') return pending(chatId)
   if (command === 'cancel') return cancelAll(chatId)
-  await sendMessage(chatId, `모르는 명령이에요: /${command}\n\n${helpText()}`)
+  await sendMessage(chatId, `모르는 명령이에요: /${command}\n\n${helpText(await loadSettings())}`)
   return 'unknown-command'
 }

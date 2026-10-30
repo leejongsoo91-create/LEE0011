@@ -113,8 +113,10 @@ const planJson = (plan) =>
     ? JSON.stringify({ summary: plan.summary, steps: plan.steps.map(({ tool, args }) => ({ tool, args })) })
     : '(없음)'
 
-export function buildUserMessage(query, { feedback, previousPlan, review } = {}) {
+export function buildUserMessage(query, { feedback, previousPlan, review, matching } = {}) {
   const lines = [`캡틴의 지시:\n${query}`]
+  // 참고용: 지금 에이전트 매칭 (에이전트 설정 부서의 계획 요약에 "무엇에서 무엇으로"를 적을 수 있게)
+  if (matching) lines.push('', `(참고) 지금 에이전트 매칭: ${matching}`)
   if (review) {
     // 상의: 방금 낸 계획에 크로스체크가 이의를 냄
     lines.push('', `내가 방금 낸 계획: ${planJson(previousPlan)}`, `크로스체크 에이전트의 의견: ${review.comments.join(' / ')}`)
@@ -132,11 +134,13 @@ export const setAnthropicClient = (client) => {
 }
 const defaultClient = () =>
   (sharedClient ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 45_000, maxRetries: 1 }))
+// 크로스체크 프로그램(crosscheck.js)도 같은 클라이언트(테스트에서는 같은 가짜)를 쓴다
+export const anthropicClient = defaultClient
 
 // AI 계획 작성기(Anthropic 프로그램). client는 테스트에서 가짜를 넣을 수 있다.
 export async function aiPlan(
   query,
-  { feedback, rules, previousPlan, review, round = 0, model = roleConfig('main').model, timeoutMs, client = defaultClient(), now = new Date() } = {},
+  { feedback, rules, previousPlan, review, matching, round = 0, model = roleConfig('main').model, timeoutMs, client = defaultClient(), now = new Date() } = {},
 ) {
   const deptIds = routeDepartments(query)
   const response = await client.messages.create(
@@ -146,7 +150,7 @@ export async function aiPlan(
       system: buildSystemPrompt(rules, now, deptIds),
       tools: [submitPlanTool(deptIds)],
       tool_choice: { type: 'auto' },
-      messages: [{ role: 'user', content: buildUserMessage(query, { feedback, previousPlan, review }) }],
+      messages: [{ role: 'user', content: buildUserMessage(query, { feedback, previousPlan, review, matching }) }],
     },
     // 시간 한도가 있는 호출은 자동 재시도를 끈다. 재시도하면 한도의 두 배가 걸려 Vercel 함수 시간(60초)을 넘길 수 있다.
     timeoutMs ? { timeout: timeoutMs, maxRetries: 0 } : undefined,

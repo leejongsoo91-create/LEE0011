@@ -6,9 +6,14 @@ import useRowDelete from '../hooks/useRowDelete.js'
 import useRows from '../hooks/useRows.js'
 import useDoubleTap from '../hooks/useDoubleTap.js'
 import { openAddModal, openDayList, openScheduleView } from '../utils/itemEditor.js'
+import { hasHolidayData, holidayOf, monthHolidays } from '../utils/holidays.js'
 
 const weekdays = ['일', '월', '화', '수', '목', '금', '토']
 const pad = (value) => String(value).padStart(2, '0')
+// 일요일·공휴일은 빨강, 토요일은 파랑 (라이트 테마에서는 더 진한 색)
+const RED = 'text-red-600 dark:text-red-400'
+const BLUE = 'text-sky-600 dark:text-sky-400'
+const dayColor = (weekday, isHoliday) => (isHoliday || weekday === 0 ? RED : weekday === 6 ? BLUE : '')
 
 // 이번 달 1일 앞의 빈 칸(일요일 시작 기준)과 날짜 목록을 만든다.
 function buildCells(year, month) {
@@ -34,6 +39,9 @@ export default function CalendarGrid() {
     setView({ year: next.getFullYear(), month: next.getMonth() })
   }
   const cells = buildCells(year, month)
+  // 이달의 공휴일 (연휴는 하나로 묶음). 공휴일 표가 없는 해는 안내만 한다.
+  const holidaysThisMonth = monthHolidays(year, month)
+  const knownYear = hasHolidayData(year)
 
   // 그 날의 일정을 시간순으로 정렬한다. (시간이 없는 종일 일정이 맨 앞)
   const dateString = (date) => `${year}-${pad(month + 1)}-${pad(date)}`
@@ -63,15 +71,16 @@ export default function CalendarGrid() {
       </div>
       <p className="-mt-2 mb-4 text-xs text-gray-400">날짜 칸을 두 번 누르면 일정 추가, 일정을 두 번 누르면 상세 보기·삭제</p>
       <div className="grid grid-cols-7 gap-1 lg:gap-2">
-        {weekdays.map((day) => (
-          <div key={day} className="py-2 text-center text-xs font-medium text-gray-400">
+        {weekdays.map((day, index) => (
+          <div key={day} className={`py-2 text-center text-xs font-medium ${dayColor(index, false) || 'text-gray-400'}`}>
             {day}
           </div>
         ))}
-        {cells.map((date, index) =>
-          date === null ? (
-            <div key={`blank-${index}`} aria-hidden="true" />
-          ) : (
+        {cells.map((date, index) => {
+          if (date === null) return <div key={`blank-${index}`} aria-hidden="true" />
+          const holiday = holidayOf(dateString(date))
+          const color = dayColor(index % 7, Boolean(holiday))
+          return (
             <div
               key={date}
               onClick={(event) => isDoubleTap(`day-${date}`, event.timeStamp) && openAddModal({ date: dateString(date) })}
@@ -79,7 +88,15 @@ export default function CalendarGrid() {
                 isThisMonth && date === today.getDate() ? 'border-gray-400 text-white' : 'border-gray-700'
               }`}
             >
-              {date}
+              {/* 폰처럼 칸이 좁으면 공휴일 이름을 날짜 아래 줄에, 넓으면 같은 줄에 */}
+              <span className={`flex min-w-0 flex-col lg:flex-row lg:items-baseline lg:gap-1 ${color}`}>
+                <span className="shrink-0">{date}</span>
+                {holiday && (
+                  <span className="min-w-0 truncate text-[10px] leading-tight lg:text-xs" title={holiday}>
+                    {holiday}
+                  </span>
+                )}
+              </span>
               {eventsOf(date).slice(0, 2).map((row) => (
                 <span
                   key={row.id}
@@ -120,9 +137,27 @@ export default function CalendarGrid() {
                 </button>
               )}
             </div>
-          ),
-        )}
+          )
+        })}
       </div>
+      <p className="mt-3 text-xs text-gray-400">
+        {!knownYear ? (
+          '이 해의 공휴일은 아직 등록되지 않았어요'
+        ) : holidaysThisMonth.length === 0 ? (
+          '이달의 공휴일: 없음'
+        ) : (
+          <>
+            이달의 공휴일:{' '}
+            {holidaysThisMonth.map((h, i) => (
+              <span key={h.start} className={RED}>
+                {i > 0 && <span className="text-gray-400"> · </span>}
+                {month + 1}/{h.start}
+                {h.end > h.start && `~${h.end}`} {h.name}
+              </span>
+            ))}
+          </>
+        )}
+      </p>
       {!isLoading && rows.length === 0 && (
         <div className="mt-4">
           <EmptyState message="아직 등록된 항목이 없습니다" hint="오른쪽 아래 + 버튼을 눌러 Schedule 페이지에서 일정을 추가해 보세요." />

@@ -3,11 +3,13 @@ import { Bot, Plus, X } from 'lucide-react'
 import useRows from '../hooks/useRows.js'
 import { openAddModal, openScheduleView } from '../utils/itemEditor.js'
 import { formatKoreanDate } from '../utils/dateFormat.js'
+import { holidayOf } from '../utils/holidays.js'
 
 // 달력의 '+N개'를 눌렀을 때 뜨는 모달: 그날의 모든 일정을 시간순으로 보여 준다.
 // 일정을 누르면 상세 모달(수정·삭제)로 이어진다.
 export default function DayEventsModal({ date, onClose }) {
   const { rows } = useRows('schedule')
+  const holiday = holidayOf(date)
   const events = rows
     .filter((row) => row.date === date)
     .sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''))
@@ -35,6 +37,7 @@ export default function DayEventsModal({ date, onClose }) {
         <header className="flex items-center justify-between">
           <h2 id="day-events-title" className="text-sm font-medium text-gray-400">
             {formatKoreanDate(date)} 일정 {events.length}개
+            {holiday && <span className="ml-2 text-red-600 dark:text-red-400">{holiday}</span>}
           </h2>
           <button type="button" onClick={onClose} aria-label="닫기" className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-700 hover:text-white">
             <X className="h-5 w-5" aria-hidden="true" />

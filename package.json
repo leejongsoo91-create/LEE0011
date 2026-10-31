@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:agents": "node --test \"api/_agents/*.test.js\"",
-    "test:hooks": "node --test \".claude/hooks/*.test.mjs\""
+    "test:hooks": "node --test \".claude/hooks/*.test.mjs\"",
+    "test:utils": "node --test \"src/utils/*.test.js\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

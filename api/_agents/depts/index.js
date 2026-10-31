@@ -2,7 +2,8 @@
 // (폴더 안: index.js 등록 정보, tools.js 도구, rules.md 부서 규칙 — rules/dept_template.md 참고)
 
 import agents from './agents/index.js'
+import invest from './invest/index.js'
 import schedule from './schedule/index.js'
 import test from './test/index.js'
 
-export const DEPARTMENTS = [schedule, agents, test]
+export const DEPARTMENTS = [schedule, invest, agents, test]

@@ -97,7 +97,7 @@ test('2. 매칭 변경은 항상 결재: 쓰기 위험도, 승인 전에는 저�
   const text = fake.sent.at(-1).text
   assert.match(text, /1\. 에이전트 매칭 변경: 메인 에이전트 → anthropic · claude-opus-5-5 \[쓰기·원복 가능\]/)
   assert.match(text, /👥 맡는 부서: 에이전트 설정 부서/)
-  assert.match(text, /📚 규칙서: 전사 공통 ✓ · 일정 부서 ✓ · 에이전트 설정 부서 ✓/)
+  assert.match(text, /📚 규칙서: 전사 공통 ✓ · 일정 부서 ✓ · 투자 부서 ✓ · 에이전트 설정 부서 ✓/)
   assert.match(text, /⚠️ 실제 대시보드 데이터가 바뀝니다/)
 
   await handleUpdate(click(`a:${task.id}`))

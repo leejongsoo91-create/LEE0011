@@ -48,7 +48,7 @@ test('submit_plan 도구(auto), 위험도는 AI가 아니라 레지스트리 값
   // claude-sonnet-5-5는 특정 도구 강제(type tool/any)를 거부한다 → auto
   assert.deepEqual(params.tool_choice, { type: 'auto' })
   assert.equal(params.model, 'claude-sonnet-5-5')
-  assert.deepEqual(params.tools[0].input_schema.properties.steps.items.properties.tool.enum, ['schedule.list', 'schedule.create', 'agents.set_matching', 'test.fail_write'])
+  assert.deepEqual(params.tools[0].input_schema.properties.steps.items.properties.tool.enum, ['schedule.list', 'schedule.create', 'invest.quote', 'invest.chart_summary', 'invest.news', 'invest.disclosures', 'invest.brief', 'agents.set_matching', 'test.fail_write'])
   assert.deepEqual(plan.steps.map((s) => s.risk), ['write', 'unknown'])
   assert.deepEqual(plan.main, { program: 'anthropic', model: 'claude-sonnet-5-5' })
   assert.deepEqual(plan.steps.map((s) => s.dept), ['schedule', 'unknown'])

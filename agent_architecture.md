@@ -137,6 +137,9 @@ api/
     depts/
       index.js                   등록된 부서 목록 (새 부서는 여기 한 줄)
       schedule/                  일정 부서: index.js(등록 정보) · tools.js(schedule.list, schedule.create) · rules.md
+      invest/                    투자 부서(조회만): tools.js(invest.quote·chart_summary·news·disclosures·brief) · rules.md
+                                 resolve.js(종목 찾기) · format.js(기준 시각·구형 데이터 경고) · providers/(none·sample·stockview)
+      agents/                    에이전트 설정 부서: agents.set_matching (매칭 변경, 결재)
       test/                      테스트 팀: 가짜 도구 3개 (규칙서 없음)
     report.js                    텔레그램 문장 템플릿 (결재 요청·결과 보고·검증 실패·중단 알림)
     errors.js                    오류 → 텔레그램에 보일 원인 한 줄 (비밀 값 제외)
@@ -213,6 +216,7 @@ where e ? 'usage' group by 1, 2 order by 1, 2;
 | 배정 준비(권장) | AI 사용량 기록, 운영 명령 `/help` `/pending` `/cancel` — **구현·자동 테스트 92개 통과** | 명령이 AI 없이 동작, 사용량이 기록에 남음 |
 | 4 | 일정 도래 시 자동 계획·결재 요청 (pg_cron → `/api/agent-cron`, 크론 호출 시크릿 검증, 일정 입력 "에이전트 작업" 칸) — **완료**: 자동 테스트 110개 통과, 실제 환경(10/30)에서 🔔 알림 → 결재 → 승인 → 일정 조회 완료 확인. 안내 문구 3건(되묻기·규칙 번호·데이터 변경 경고) 정리 | 일정 10분 전에 🔔 결재 요청이 오고, 승인하면 실행, 같은 일정으로 두 번 오지 않음 |
 | 5 (마지막) | 에이전트 프로그램 매칭을 결재로: 에이전트 설정 부서(`agents.set_matching`), `agent_settings` 표(SQL `20261031000000`), Anthropic 크로스체크 프로그램 — **완료**: 자동 테스트 123개 통과, 실제 환경(10/31)에서 결재로 매칭 변경 확인 | 텔레그램으로 "메인을 Opus 5.5로 바꿔줘" → 결재 → ✅ → `/help`에 반영, 같은 방법으로 원복 |
+| 투자 부서 | StockView 기준 조회 부서: 시세·차트 요약·뉴스·공시·시장 브리핑, 데이터 공급자 자리(`INVEST_PROVIDER`: none·sample·stockview, `STOCKVIEW_URL`), 기본값(차트 3개월·뉴스/브리핑 오늘), 24시간 구형 데이터 경고, market_type(US/KR) — **구현·자동 테스트 136개 통과**, 실제 확인은 sample부터 | 텔레그램 "삼성전자 지금 얼마야?"·"시장 브리핑 해줘" → 결재 없이 보고, 🧪 예시 표시 |
 
 ## 12. 열린 항목
 

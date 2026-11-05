@@ -4,7 +4,7 @@
 import test, { beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { handleUpdate } from './approval.js'
-import { investBrief, investChartSummary, investDisclosures, investNews, investQuote } from './depts/invest/tools.js'
+import { investBrief, investChartSummary, investDisclosures, investNews, investQuote, investReport, stripReportWords } from './depts/invest/tools.js'
 import { NOT_CONNECTED, currentProvider, setInvestProvider } from './depts/invest/providers/index.js'
 import { createSampleProvider } from './depts/invest/providers/sample.js'
 import { createStockviewProvider, parseKrTime } from './depts/invest/providers/stockview.js'
@@ -137,11 +137,11 @@ test('2. 종목 찾기: 미국은 티커·한글 이름·영문 이름·별칭, 
   assert.match(many.summary, /여러 개예요: 알파벳A\(GOOGL\), 알파벳C\(GOOG\)/)
 })
 
-test('3. 시세: 이름(티커)·가격·등락·52주 위치·기준 시각, 새 데이터면 경고 없음', async () => {
+test('3. 시세: 이름(티커)·가격·등락·1년 범위 위치·기준 시각, 새 데이터면 경고 없음', async () => {
   const { summary } = await run(investQuote, { symbol: '애플', market_type: 'US' })
   assert.match(summary, /^애플\(AAPL\) \$271\.3 \(\+1\.21%\) · 기준: \d+\/\d+ \d\d:\d\d/)
   assert.match(summary, /거래량 5,230만/)
-  assert.match(summary, /52주 \$169\.2~\$288\.6 중 86% 위치 · PER 36\.2/)
+  assert.match(summary, /1년 범위 \$169\.2~\$288\.6 중 86% 위치 · PER 36\.2/)
   assert.ok(!summary.includes('⚠️'))
   const kr = await run(investQuote, { symbol: '삼성전자', market_type: 'KR' })
   assert.match(kr.summary, /^삼성전자\(005930\) 98,400원 \(\+1\.86%\)/)
@@ -297,4 +297,78 @@ test('13. 국내 뉴스 시각 읽기: "YYYY.MM.DD HH:MM"·날짜만·알 수 �
   assert.equal(parseKrTime('2026.10.31 14:20'), Date.parse('2026-10-31T14:20:00+09:00'))
   assert.equal(parseKrTime('2026.10.31'), Date.parse('2026-10-31T00:00:00+09:00'))
   assert.equal(parseKrTime('10m ago'), null)
+})
+
+// ── 종목 리포트 (invest.report) ──
+
+test('14. 리포트 이름 다듬기: 끝의 리포트·정리·요약을 떼고 종목 이름만 (띄어쓰기 없어도)', () => {
+  assert.equal(stripReportWords('삼성전자리포트'), '삼성전자')
+  assert.equal(stripReportWords('삼성전자 리포트'), '삼성전자')
+  assert.equal(stripReportWords('애플 정리해줘'), '애플')
+  assert.equal(stripReportWords('엔비디아 종목 요약'), '엔비디아')
+  assert.equal(stripReportWords('NAVER'), 'NAVER')
+  assert.equal(stripReportWords('리포트'), '리포트', '다 지워지면 원래 말 그대로')
+})
+
+test('15. 국내 리포트: 가격·흐름(3개월)·뉴스 3건·그 종목 공시·투자 판단 안 함, 예시 표시', async () => {
+  setInvestProvider(createSampleProvider())
+  const { summary } = await run(investReport, { symbol: '삼성전자리포트', market_type: 'KR' })
+  const lines = summary.split('\n')
+  assert.equal(lines[0], SAMPLE_MARK)
+  assert.match(lines[1], /^📊 삼성전자\(005930\) 리포트 · 기준: /)
+  assert.match(summary, /\n가격 {2}98,400원 \(\+1\.86%\) · 1년 범위 50,800원~104,200원 중 89% 위치 · PER 21\.3/)
+  assert.match(summary, /\n흐름 {2}3개월 [+-]\d+\.\d\d% · 최고 [\d,]+원 \(\d+\/\d+\) · 최저 [\d,]+원 \(\d+\/\d+\)/)
+  assert.equal(lines.filter((line) => line.startsWith('  • ') && line.includes('예시 언론사')).length, 3)
+  assert.match(summary, /\n공시\n {2}• 15:42 \[예시\] 기업설명회\(IR\) 개최 \[IR\]/)
+  assert.doesNotMatch(summary, /SK하이닉스/, '다른 회사 공시는 넣지 않는다')
+  assert.equal(lines.at(-1), '참고  투자 판단(사라·팔라)은 하지 않습니다')
+})
+
+test('16. 미국 리포트: 공시 자리는 "국내 종목만", 공시는 조회하지 않음 (StockView)', async () => {
+  const { summary } = await run(investReport, { symbol: '애플 리포트', market_type: 'US' })
+  assert.match(summary, /^📊 애플\(AAPL\) 리포트 · 기준: /)
+  assert.match(summary, /가격 {2}\$271\.3 \(\+1\.21%\) · 1년 범위/)
+  assert.match(summary, /\n공시 {2}국내 종목만 조회할 수 있어요/)
+  assert.ok(!sv.paths.some((path) => path.includes('disclosure')), '미국 종목이면 공시를 부르지 않는다')
+})
+
+test('17. 리포트 일부 실패: 뉴스만 실패하면 나머지는 그대로, 뉴스 자리에 "받지 못했어요" · 모두 실패면 오류', async () => {
+  const sample = createSampleProvider()
+  setInvestProvider({ ...sample, news: async () => { throw new Error('news down') } })
+  const { summary } = await run(investReport, { symbol: '삼성전자', market_type: 'KR' })
+  assert.match(summary, /\n가격 {2}98,400원/)
+  assert.match(summary, /\n뉴스 {2}받지 못했어요/)
+  assert.match(summary, /\n공시\n/)
+
+  const boom = async () => { throw new Error('all down') }
+  setInvestProvider({ ...sample, quote: boom, chart: boom, news: boom, disclosures: boom })
+  await assert.rejects(run(investReport, { symbol: '삼성전자', market_type: 'KR' }), /all down/)
+})
+
+test('18. 리포트 종목 찾기: 여러 후보면 고르라고 안내, 연결 전이면 연결 안내', async () => {
+  setInvestProvider(createSampleProvider())
+  const { summary } = await run(investReport, { symbol: '알파벳리포트', market_type: 'US' })
+  assert.match(summary, /'알파벳'에 맞는 종목이 여러 개예요: 알파벳A\(GOOGL\), 알파벳C\(GOOG\)/)
+  setInvestProvider(null)
+  delete process.env.INVEST_PROVIDER
+  assert.equal((await run(investReport, { symbol: '삼성전자', market_type: 'KR' })).summary, NOT_CONNECTED)
+})
+
+test('19. 전체 흐름: "삼성전자리포트" → AI 계획(invest.report) → 결재 없이 실행 → 리포트 보고', async () => {
+  setInvestProvider(createSampleProvider())
+  process.env.ANTHROPIC_API_KEY = 'test-key'
+  const client = fakeAnthropic({ summary: '삼성전자 종목 리포트 (국내)', steps: [{ tool: 'invest.report', args: { symbol: '삼성전자리포트', market_type: 'KR' } }] })
+  setAnthropicClient(client)
+  assert.equal(await handleUpdate(message('삼성전자리포트', { updateId: updateId++ })), 'completed')
+  const task = fake.tasks.at(-1)
+  assert.equal(task.status, 'COMPLETED')
+  assert.ok(task.event_logs.some((e) => e.event === 'AUTO_APPROVED'))
+  assert.equal(task.plan_payload.steps[0].dept, 'invest')
+  const report = fake.sent.at(-1).text
+  assert.match(report, /📊 삼성전자\(005930\) 리포트/)
+  assert.match(report, /흐름 {2}3개월/)
+  assert.match(report, /투자 판단\(사라·팔라\)은 하지 않습니다/)
+  const prompt = buildSystemPrompt(loadRules(), new Date('2026-11-06T08:00:00Z'))
+  assert.match(prompt, /invest\.report \(위험도 read, 투자 부서\)/)
+  assert.match(prompt, /"삼성전자리포트" → 삼성전자/)
 })

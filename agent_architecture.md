@@ -139,7 +139,7 @@ api/
     depts/
       index.js                   등록된 부서 목록 (새 부서는 여기 한 줄)
       schedule/                  일정 부서: index.js(등록 정보) · tools.js(schedule.list, schedule.create) · rules.md
-      invest/                    투자 부서(조회만): tools.js(invest.quote·chart_summary·news·disclosures·brief) · rules.md
+      invest/                    투자 부서(조회만): tools.js(invest.quote·chart_summary·news·disclosures·brief·report) · rules.md
                                  resolve.js(종목 찾기) · format.js(기준 시각·구형 데이터 경고) · providers/(none·sample·stockview)
       agents/                    에이전트 설정 부서: agents.set_matching (매칭 변경, 결재)
       test/                      테스트 팀: 가짜 도구 3개 (규칙서 없음)
@@ -220,6 +220,7 @@ where e ? 'usage' group by 1, 2 order by 1, 2;
 | 5 (마지막) | 에이전트 프로그램 매칭을 결재로: 에이전트 설정 부서(`agents.set_matching`), `agent_settings` 표(SQL `20261031000000`), Anthropic 크로스체크 프로그램 — **완료**: 자동 테스트 123개 통과, 실제 환경(10/31)에서 결재로 매칭 변경 확인 | 텔레그램으로 "메인을 Opus 5.5로 바꿔줘" → 결재 → ✅ → `/help`에 반영, 같은 방법으로 원복 |
 | 투자 부서 | StockView 기준 조회 부서: 시세·차트 요약·뉴스·공시·시장 브리핑, 데이터 공급자 자리(`INVEST_PROVIDER`: none·sample·stockview, `STOCKVIEW_URL`), 기본값(차트 3개월·뉴스/브리핑 오늘), 24시간 구형 데이터 경고, market_type(US/KR) — **구현·자동 테스트 136개 통과**, 실제 환경(11/6, `INVEST_PROVIDER=sample`)에서 시세·차트·뉴스·공시·브리핑·여러 후보·미국 공시 안내·투자 판단 거절 8가지 확인 완료 | 텔레그램 "삼성전자 지금 얼마야?"·"시장 브리핑 해줘" → 결재 없이 보고, 🧪 예시 표시 |
 | 중앙관제 화면 | 대시보드 `/control`: 영역 카드 4개(에이전트·업무·일정·투자), 확인 필요, 최근 에이전트 작업. 에이전트 숫자는 `/api/control-summary`(주인만, 보기 전용) — **구현·자동 테스트 143개 통과** | 폰에서 Control 탭 → 결재 대기·완료 숫자가 텔레그램 작업과 맞음 |
+| 종목 리포트 | `invest.report`: 종목 하나를 물으면 가격·3개월 흐름·뉴스 3건·오늘 공시(국내)를 한 보고로, 조각 하나가 실패해도 나머지는 보고, "삼성전자리포트"처럼 붙여 써도 종목을 찾음, 투자 판단 안 함 — **구현·자동 테스트 149개 통과** | 텔레그램 "삼성전자리포트" → 결재 없이 📊 리포트 |
 
 ## 12. 열린 항목
 

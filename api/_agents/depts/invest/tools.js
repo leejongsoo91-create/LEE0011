@@ -1,5 +1,5 @@
-// 투자 부서 도구 5개 (모두 read: 조회만, 결재 없이 실행). 규칙서: depts/invest/rules.md
-//   invest.quote · invest.chart_summary · invest.news · invest.disclosures · invest.brief
+// 투자 부서 도구 6개 (모두 read: 조회만, 결재 없이 실행). 규칙서: depts/invest/rules.md
+//   invest.quote · invest.chart_summary · invest.news · invest.disclosures · invest.brief · invest.report(종목 리포트)
 // 데이터는 공급자(providers/)에게만 묻는다. 기본값·구형 데이터 경고·시장 구분은 AI가 아니라 이 코드가 챙긴다.
 // 매수·매도 추천이나 가격 예측은 하지 않는다. 데이터만 정리해 보고한다.
 
@@ -12,6 +12,7 @@ export const PERIODS = { '1mo': '1개월', '3mo': '3개월', '6mo': '6개월', '
 export const DEFAULT_PERIOD = '3mo'
 export const NEWS_LIMIT = 5
 export const DISCLOSURE_LIMIT = 10
+export const REPORT_NEWS_LIMIT = 3
 const MARKET_LABEL = { US: '미국', KR: '국내' }
 
 function onlyKeys(args, allowed) {
@@ -40,12 +41,39 @@ async function withSymbol(provider, market, symbol, work) {
   return work(result.found)
 }
 
+// 차트 막대 → 기간 수익률·최고·최저·최근 5일 거래량 배수 (막대가 2개 미만이면 null)
+function chartStats(rawBars) {
+  const bars = rawBars.filter((bar) => bar.close != null)
+  if (bars.length < 2) return null
+  const first = bars[0]
+  const last = bars.at(-1)
+  const high = bars.reduce((a, b) => ((b.high ?? b.close) > (a.high ?? a.close) ? b : a))
+  const low = bars.reduce((a, b) => ((b.low ?? b.close) < (a.low ?? a.close) ? b : a))
+  const avg = (list) => list.reduce((sum, bar) => sum + (bar.volume ?? 0), 0) / list.length
+  return {
+    first,
+    last,
+    changePct: (last.close / first.close - 1) * 100,
+    high: { price: high.high ?? high.close, date: high.date },
+    low: { price: low.low ?? low.close, date: low.date },
+    volumeRatio: avg(bars) > 0 ? avg(bars.slice(-5)) / avg(bars) : null,
+  }
+}
+const day = (date) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`
+
+// 현재가가 1년(52주) 최저~최고 사이 어디쯤인지 (0~100%)
+function yearRange(q, market) {
+  if (q.high52 == null || q.low52 == null || !(q.high52 > q.low52)) return null
+  const position = Math.round(((q.price - q.low52) / (q.high52 - q.low52)) * 100)
+  return { text: `1년 범위 ${money(q.low52, market)}~${money(q.high52, market)} 중 ${position}% 위치`, position }
+}
+
 const label = (found) => `${found.name}(${found.market === 'KR' ? found.code : found.ticker})`
 
 export const investQuote = {
   label: '시세',
   risk: 'read',
-  description: '종목 1개의 현재가·등락률·거래량·52주 최고/최저 대비 위치·PER을 기준 시각과 함께 조회한다.',
+  description: '종목 1개의 현재가·등락률·거래량·1년(52주) 최고/최저 대비 위치·PER을 기준 시각과 함께 조회한다. 가격만 물었을 때 쓴다.',
   schema: { type: 'object', properties: { symbol: symbolSchema, market_type: marketSchema }, required: ['symbol', 'market_type'] },
   check(args) {
     const keys = onlyKeys(args, ['symbol', 'market_type'])
@@ -60,11 +88,9 @@ export const investQuote = {
         const q = await provider.quote(found)
         if (!q || q.price == null) return { summary: assemble({ sample: provider.sample, lines: [`${label(found)} 가격 정보를 받지 못했어요`] }) }
         const warning = freshnessWarning(q.asOf)
-        const range = q.high52 != null && q.low52 != null && q.high52 > q.low52
-        const position = range ? Math.round(((q.price - q.low52) / (q.high52 - q.low52)) * 100) : null
         const details = [
           `거래량 ${count(q.volume)}`,
-          range ? `52주 ${money(q.low52, found.market)}~${money(q.high52, found.market)} 중 ${position}% 위치` : null,
+          yearRange(q, found.market)?.text,
           q.pe != null ? `PER ${q.pe.toFixed(1)}` : null,
         ].filter(Boolean)
         return {
@@ -109,22 +135,16 @@ export const investChartSummary = {
         if (chart.dummy) {
           return { summary: `⚠️ StockView가 ${label(found)}의 실제 차트를 받지 못해 예시 차트를 보냈어요. 실제 데이터가 아니라서 숫자는 보여 드리지 않을게요` }
         }
-        const bars = chart.bars.filter((bar) => bar.close != null)
-        if (bars.length < 2) return { summary: assemble({ sample: provider.sample, lines: [`${label(found)} ${periodLabel} 차트 데이터가 없어요`] }) }
-        const first = bars[0]
-        const last = bars.at(-1)
-        const high = bars.reduce((a, b) => ((b.high ?? b.close) > (a.high ?? a.close) ? b : a))
-        const low = bars.reduce((a, b) => ((b.low ?? b.close) < (a.low ?? a.close) ? b : a))
-        const avg = (list) => list.reduce((sum, bar) => sum + (bar.volume ?? 0), 0) / list.length
-        const volumeRatio = avg(bars) > 0 ? avg(bars.slice(-5)) / avg(bars) : null
-        const day = (date) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`
+        const stats = chartStats(chart.bars)
+        if (!stats) return { summary: assemble({ sample: provider.sample, lines: [`${label(found)} ${periodLabel} 차트 데이터가 없어요`] }) }
+        const { first, last, high, low, volumeRatio } = stats
         return {
           summary: assemble({
             sample: provider.sample,
             warnings: [freshnessWarning(chart.asOf)],
             lines: [
-              `${label(found)} ${periodLabel}: ${pct((last.close / first.close - 1) * 100)} (${money(first.close, found.market)} → ${money(last.close, found.market)}) · ${asOfNote(chart.asOf)}`,
-              `최고 ${money(high.high ?? high.close, found.market)} (${day(high.date)}) · 최저 ${money(low.low ?? low.close, found.market)} (${day(low.date)})`,
+              `${label(found)} ${periodLabel}: ${pct(stats.changePct)} (${money(first.close, found.market)} → ${money(last.close, found.market)}) · ${asOfNote(chart.asOf)}`,
+              `최고 ${money(high.price, found.market)} (${day(high.date)}) · 최저 ${money(low.price, found.market)} (${day(low.date)})`,
               volumeRatio != null ? `최근 5일 거래량: 기간 평균의 ${volumeRatio.toFixed(1)}배` : null,
             ].filter(Boolean),
           }),
@@ -291,4 +311,95 @@ export const investBrief = {
 
       return { summary: assemble({ sample: provider.sample, warnings, lines }) }
     }),
+}
+
+
+// 지시 끝에 붙은 "리포트·정리해줘·보고서" 같은 말을 떼고 종목 이름만 남긴다. (예: 삼성전자리포트 → 삼성전자)
+const REPORT_WORDS = /\s*(?:종목\s*)?(?:리포트|레포트|보고서|정리해\s*줘|정리|요약해\s*줘|요약)\s*$/u
+export const stripReportWords = (symbol) => String(symbol).replace(REPORT_WORDS, '').trim() || String(symbol).trim()
+
+export const NO_ADVICE = '참고  투자 판단(사라·팔라)은 하지 않습니다'
+
+// 종목 리포트: 가격·흐름(3개월)·뉴스 3건·오늘 공시(국내)를 한 번에. 한 조각이 실패해도 나머지는 보여 준다.
+export const investReport = {
+  label: '종목 리포트',
+  risk: 'read',
+  description:
+    '종목 1개 리포트: 가격(현재가·등락률·1년 범위 위치·PER), 흐름(3개월 수익률·최고·최저), 최신 뉴스 3건, 오늘 공시(국내만)를 한 보고로 정리한다. 리포트·정리·요약을 원하거나, 종목 이름만 보냈거나, 사도 되는지·팔아야 하는지 물었을 때 쓴다.',
+  schema: { type: 'object', properties: { symbol: symbolSchema, market_type: marketSchema }, required: ['symbol', 'market_type'] },
+  check(args) {
+    const keys = onlyKeys(args, ['symbol', 'market_type'])
+    if (keys) return keys
+    if (badSymbol(args.symbol)) return 'symbol은 1~40자 글자여야 합니다'
+    return checkMarket(args.market_type)
+  },
+  describe: (args) => `${stripReportWords(args.symbol)} · ${MARKET_LABEL[args.market_type]} · 가격·흐름(3개월)·뉴스·공시`,
+  run: (args) =>
+    withProvider((provider) =>
+      withSymbol(provider, args.market_type, stripReportWords(args.symbol), async (found) => {
+        const isKR = found.market === 'KR'
+        const [quote, chart, news, disclosures] = await Promise.allSettled([
+          provider.quote(found),
+          provider.chart(found, DEFAULT_PERIOD),
+          provider.news({ market: found.market, ticker: isKR ? null : found.ticker, code: found.code ?? null }),
+          isKR ? provider.disclosures() : Promise.resolve(null),
+        ])
+        const parts = isKR ? [quote, chart, news, disclosures] : [quote, chart, news]
+        if (parts.every((part) => part.status === 'rejected')) throw quote.reason
+
+        const m = found.market
+        const failed = '받지 못했어요'
+        const warnings = []
+        const lines = []
+
+        // 가격
+        const q = quote.status === 'fulfilled' ? quote.value : null
+        if (q && q.price != null) {
+          warnings.push(freshnessWarning(q.asOf))
+          lines.push(`📊 ${label(found)} 리포트 · ${asOfNote(q.asOf)}`)
+          const price = [`${money(q.price, m)} (${pct(q.changePct)})`, yearRange(q, m)?.text, q.pe != null ? `PER ${q.pe.toFixed(1)}` : null]
+          lines.push(`가격  ${price.filter(Boolean).join(' · ')}`)
+        } else {
+          lines.push(`📊 ${label(found)} 리포트`, `가격  ${failed}`)
+        }
+
+        // 흐름 (3개월)
+        const c = chart.status === 'fulfilled' ? chart.value : null
+        const stats = c && !c.dummy ? chartStats(c.bars ?? []) : null
+        if (stats) {
+          warnings.push(freshnessWarning(c.asOf))
+          lines.push(
+            `흐름  ${PERIODS[DEFAULT_PERIOD]} ${pct(stats.changePct)} · 최고 ${money(stats.high.price, m)} (${day(stats.high.date)}) · 최저 ${money(stats.low.price, m)} (${day(stats.low.date)})`,
+          )
+        } else {
+          lines.push(`흐름  ${c?.dummy ? '실제 차트를 받지 못했어요' : c ? '차트 데이터가 없어요' : failed}`)
+        }
+
+        // 뉴스 (최신 3건)
+        if (news.status === 'fulfilled') {
+          const { lines: newsList, newest, total } = newsLines(news.value ?? [])
+          if (total === 0) lines.push('뉴스  새 뉴스가 없어요')
+          else {
+            warnings.push(freshnessWarning(newest))
+            lines.push('뉴스', ...newsList.slice(0, REPORT_NEWS_LIMIT).map((line) => `  ${line}`))
+          }
+        } else lines.push(`뉴스  ${failed}`)
+
+        // 공시 (국내만, 오늘)
+        if (!isKR) lines.push('공시  국내 종목만 조회할 수 있어요')
+        else if (disclosures.status === 'fulfilled' && disclosures.value) {
+          const { items = [], asOf } = disclosures.value
+          const key = found.name.replace(/\s+/g, '')
+          const mine = items.filter((d) => String(d.company).replace(/\s+/g, '') === key).slice(0, DISCLOSURE_LIMIT)
+          if (mine.length === 0) lines.push('공시  오늘 없어요')
+          else {
+            warnings.push(freshnessWarning(asOf))
+            lines.push('공시', ...mine.map((d) => `  • ${d.time} ${d.title}${d.category ? ` [${d.category}]` : ''}`))
+          }
+        } else lines.push(`공시  ${failed}`)
+
+        lines.push(NO_ADVICE)
+        return { summary: assemble({ sample: provider.sample, warnings, lines }), asOf: q?.asOf ?? null }
+      }),
+    ),
 }

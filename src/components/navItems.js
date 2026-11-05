@@ -1,8 +1,9 @@
-import { House, CalendarDays, Briefcase, Palette, TrendingUp } from 'lucide-react'
+import { House, Radar, CalendarDays, Briefcase, Palette, TrendingUp } from 'lucide-react'
 
 // 사이드바, 하단 탭, 헤더가 함께 사용하는 메뉴 목록
 export const navItems = [
   { to: '/', label: 'Home', icon: House },
+  { to: '/control', label: 'Control', icon: Radar },
   { to: '/schedule', label: 'Schedule', icon: CalendarDays },
   { to: '/work', label: 'Work', icon: Briefcase },
   { to: '/hobbies', label: 'Hobbies', icon: Palette },

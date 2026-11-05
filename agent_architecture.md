@@ -120,10 +120,12 @@ agent_architecture.md            이 문서
 api/
   webhook.js                     스위치(AGENT_MODE)가 꺼져 있으면 echo, 켜져 있으면 approval.js로 연결
   agent-cron.js                  일정 자동 작업 크론 입구 (pg_cron 1분마다, CRON_SECRET 검증 → 남은 작업 정리 → 자동 작업 1개)
+  control-summary.js             중앙관제 화면(/control)용 작업 요약 (GET, 로그인 토큰 → 주인만, 개수·짧은 목록만. 계획 원문 없음)
   _agents/
     approval.js                  텔레그램 입구: 새 지시 · [승인]/[반려] 버튼 · 반려 사유 답장 · 운영 명령 분기
     commands.js                  운영 명령 /help /pending /cancel (AI 호출 없음)
     orchestrator.js              PLANNING→VALIDATING(상의)→PENDING/자동 승인, 시간 예산, 남은 작업 정리
+    control.js                   중앙관제 요약: 최근 7일 작업의 상태별 개수, 확인 필요(FAILED·INTERRUPTED·STALLED·STEP_UNCERTAIN), 최근 10건
     scheduleTrigger.js           일정 자동 작업: 때가 된 일정 찾기, source_key, 놓친 작업(MISSED), planAndRoute 호출
     agents.config.js             역할별 설정: 메인·크로스체크 프로그램 자리, 모델, 시간 한도, 상의 횟수. 순서: 저장값(agent_settings) → 환경변수 → 기본값
     settings.js                  agent_settings(한 줄) 읽기·저장, 고를 수 있는 프로그램·모델 허용 목록
@@ -217,6 +219,7 @@ where e ? 'usage' group by 1, 2 order by 1, 2;
 | 4 | 일정 도래 시 자동 계획·결재 요청 (pg_cron → `/api/agent-cron`, 크론 호출 시크릿 검증, 일정 입력 "에이전트 작업" 칸) — **완료**: 자동 테스트 110개 통과, 실제 환경(10/30)에서 🔔 알림 → 결재 → 승인 → 일정 조회 완료 확인. 안내 문구 3건(되묻기·규칙 번호·데이터 변경 경고) 정리 | 일정 10분 전에 🔔 결재 요청이 오고, 승인하면 실행, 같은 일정으로 두 번 오지 않음 |
 | 5 (마지막) | 에이전트 프로그램 매칭을 결재로: 에이전트 설정 부서(`agents.set_matching`), `agent_settings` 표(SQL `20261031000000`), Anthropic 크로스체크 프로그램 — **완료**: 자동 테스트 123개 통과, 실제 환경(10/31)에서 결재로 매칭 변경 확인 | 텔레그램으로 "메인을 Opus 5.5로 바꿔줘" → 결재 → ✅ → `/help`에 반영, 같은 방법으로 원복 |
 | 투자 부서 | StockView 기준 조회 부서: 시세·차트 요약·뉴스·공시·시장 브리핑, 데이터 공급자 자리(`INVEST_PROVIDER`: none·sample·stockview, `STOCKVIEW_URL`), 기본값(차트 3개월·뉴스/브리핑 오늘), 24시간 구형 데이터 경고, market_type(US/KR) — **구현·자동 테스트 136개 통과**, 실제 확인은 sample부터 | 텔레그램 "삼성전자 지금 얼마야?"·"시장 브리핑 해줘" → 결재 없이 보고, 🧪 예시 표시 |
+| 중앙관제 화면 | 대시보드 `/control`: 영역 카드 4개(에이전트·업무·일정·투자), 확인 필요, 최근 에이전트 작업. 에이전트 숫자는 `/api/control-summary`(주인만, 보기 전용) — **구현·자동 테스트 143개 통과** | 폰에서 Control 탭 → 결재 대기·완료 숫자가 텔레그램 작업과 맞음 |
 
 ## 12. 열린 항목
 

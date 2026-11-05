@@ -3,6 +3,7 @@ import Layout from './components/Layout.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Login from './pages/Login.jsx'
 import Home from './pages/Home.jsx'
+import Control from './pages/Control.jsx'
 import Schedule from './pages/Schedule.jsx'
 import Work from './pages/Work.jsx'
 import Hobbies from './pages/Hobbies.jsx'
@@ -17,6 +18,7 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
           <Route index element={<Home />} />
+          <Route path="control" element={<Control />} />
           <Route path="schedule" element={<Schedule />} />
           <Route path="work" element={<Work />} />
           <Route path="hobbies" element={<Hobbies />} />

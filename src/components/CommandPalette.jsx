@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Command } from 'cmdk'
-import { navItems } from './navItems.js'
+import { itemsOf, navGroups } from './navItems.js'
 
 // Ctrl+K / Cmd+K 로 여는 빠른 검색 팝업. 페이지 이동 메뉴를 보여준다.
 export default function CommandPalette() {
@@ -40,22 +40,25 @@ export default function CommandPalette() {
         <Command.Empty className="px-3 py-6 text-center text-sm text-gray-400">
           결과가 없습니다.
         </Command.Empty>
-        <Command.Group
-          heading="페이지 이동"
-          className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-gray-400"
-        >
-          {navItems.map(({ to, label, icon: Icon }) => (
-            <Command.Item
-              key={to}
-              value={label}
-              onSelect={() => handleSelect(to)}
-              className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-gray-300 data-[selected=true]:bg-gray-700 data-[selected=true]:text-white"
-            >
-              <Icon className="h-4 w-4" aria-hidden="true" />
-              {label}
-            </Command.Item>
-          ))}
-        </Command.Group>
+        {navGroups.map((group) => (
+          <Command.Group
+            key={group.id}
+            heading={group.label}
+            className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-gray-400"
+          >
+            {itemsOf(group.id).map(({ to, label, icon: Icon }) => (
+              <Command.Item
+                key={to}
+                value={label}
+                onSelect={() => handleSelect(to)}
+                className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-gray-300 data-[selected=true]:bg-gray-700 data-[selected=true]:text-white"
+              >
+                <Icon className="h-4 w-4" aria-hidden="true" />
+                {label}
+              </Command.Item>
+            ))}
+          </Command.Group>
+        ))}
       </Command.List>
     </Command.Dialog>
   )

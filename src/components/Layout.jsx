@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Toaster } from 'sonner'
-import Sidebar from './Sidebar.jsx'
-import BottomTab from './BottomTab.jsx'
 import Header from './Header.jsx'
 import Fab from './Fab.jsx'
 import AddItemModal from './AddItemModal.jsx'
@@ -52,16 +50,14 @@ export default function Layout() {
 
   return (
     <>
-      <Toaster theme={theme} position="bottom-center" offset={90} mobileOffset={90} />
+      <Toaster theme={theme} position="bottom-center" offset={24} mobileOffset={90} />
       <CommandPalette />
-      <Sidebar />
-      <div className="min-h-screen lg:ml-[var(--sidebar-w,250px)]">
+      <div className="min-h-screen">
         <Header />
-        <main className="@container p-4 pb-40 lg:p-8 lg:pb-24">
+        <main className="@container p-4 pb-28 lg:p-8 lg:pb-24">
           <Outlet />
         </main>
       </div>
-      <BottomTab />
       <Fab onClick={() => setIsModalOpen(true)} />
       {isModalOpen && <AddItemModal key={editing?.row.id ?? 'new'} editing={editing} prefill={prefill} onClose={closeModal} />}
       {viewingDay && <DayEventsModal date={viewingDay} onClose={() => setViewingDay(null)} />}

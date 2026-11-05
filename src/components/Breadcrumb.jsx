@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
-import { navItems } from './navItems.js'
+import { navGroups, navItems } from './navItems.js'
 import { loadTitle } from '../utils/pageTitle.js'
 
 const linkClass = 'shrink-0 text-gray-400 transition-colors hover:text-white'
 
-// '홈 > 업무 > 현재 제목' 형태의 빵부스러기 내비게이션
+// '홈 > 업무 > 현재 제목' 형태의 빵부스러기 내비게이션. 관리 메뉴는 '관리 > 관제'
 export default function Breadcrumb() {
   const { pathname } = useLocation()
   const [title, setTitle] = useState(() => loadTitle(pathname))
   const currentItem = navItems.find((item) => item.to === pathname) ?? navItems[0]
   const isSettings = pathname === '/settings'
   const isHome = currentItem.to === '/' && !isSettings
+  const isManage = currentItem.group === 'manage' && !isSettings
 
   useEffect(() => {
     const sync = () => setTitle(loadTitle(pathname))
@@ -27,6 +28,12 @@ export default function Breadcrumb() {
       <ol className="flex min-w-0 items-center gap-1.5 text-sm">
         {isHome ? (
           <li aria-current="page" className="font-semibold text-white">홈</li>
+        ) : isManage ? (
+          <>
+            <li className="shrink-0 text-gray-400">{navGroups.find((group) => group.id === 'manage').label}</li>
+            <ChevronRight className="h-4 w-4 shrink-0 text-gray-600" aria-hidden="true" />
+            <li aria-current="page" className="font-semibold text-white">{currentItem.label}</li>
+          </>
         ) : isSettings ? (
           <>
             <li className={linkClass}><Link to="/">홈</Link></li>

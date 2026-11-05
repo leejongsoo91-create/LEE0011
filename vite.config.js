@@ -12,8 +12,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'My Dashboard',
-        short_name: 'Dashboard',
+        name: '내 대시보드',
+        short_name: '대시보드',
         description: '업무·취미·투자·일정을 한 곳에서 보는 개인 대시보드',
         lang: 'ko',
         start_url: '/',

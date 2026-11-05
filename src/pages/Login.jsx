@@ -51,7 +51,7 @@ export default function Login() {
       <Toaster theme={theme} position="bottom-center" />
       <form onSubmit={handleLogin} className="flex w-full max-w-sm flex-col gap-4 rounded-2xl bg-gray-800 p-6">
         <header>
-          <h1 className="text-xl font-bold text-white">My Dashboard</h1>
+          <h1 className="text-xl font-bold text-white">내 대시보드</h1>
           <p className="mt-1 text-sm text-gray-400">로그인하고 내 데이터를 확인하세요</p>
         </header>
         <label className="flex flex-col gap-1 text-xs text-gray-400">

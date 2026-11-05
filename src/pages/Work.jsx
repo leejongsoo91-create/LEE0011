@@ -5,7 +5,7 @@ import KanbanBoard from '../components/KanbanBoard.jsx'
 export default function Work() {
   return (
     <>
-      <NotionPage name="Work" columns={['이름', '태그', '상태']} />
+      <NotionPage name="업무" columns={['이름', '태그', '상태']} />
       <KanbanBoard />
     </>
   )

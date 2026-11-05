@@ -5,7 +5,7 @@ import HobbyList from '../components/HobbyList.jsx'
 export default function Hobbies() {
   return (
     <>
-      <NotionPage name="Hobbies" columns={['이름', '태그', '날짜']} />
+      <NotionPage name="취미" columns={['이름', '태그', '날짜']} />
       <HobbyList />
     </>
   )

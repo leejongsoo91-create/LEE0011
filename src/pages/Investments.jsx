@@ -5,7 +5,7 @@ import HoldingsSection from '../components/HoldingsSection.jsx'
 export default function Investments() {
   return (
     <>
-      <NotionPage name="Investments" columns={['종목명', '티커', '수량']} />
+      <NotionPage name="투자" columns={['종목명', '티커', '수량']} />
       <HoldingsSection />
     </>
   )

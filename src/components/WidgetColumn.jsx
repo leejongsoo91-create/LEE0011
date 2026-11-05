@@ -10,6 +10,9 @@ const widgetContents = {
   Investments: <InvestmentsSummary />,
 }
 
+// 위젯 안쪽 이름 → 화면에 보일 한글 제목
+const widgetTitles = { Schedule: '일정', Work: '업무', Hobbies: '취미', Investments: '투자' }
+
 // 드래그 가능한 위젯들이 세로로 쌓이는 한 개의 열
 export default function WidgetColumn({ id, titles }) {
   return (
@@ -24,7 +27,7 @@ export default function WidgetColumn({ id, titles }) {
             <Draggable key={title} draggableId={title} index={index}>
               {(dragProvided) => (
                 <div ref={dragProvided.innerRef} {...dragProvided.draggableProps}>
-                  <WidgetBox title={title} handleProps={dragProvided.dragHandleProps}>
+                  <WidgetBox title={widgetTitles[title] ?? title} handleProps={dragProvided.dragHandleProps}>
                     {widgetContents[title]}
                   </WidgetBox>
                 </div>

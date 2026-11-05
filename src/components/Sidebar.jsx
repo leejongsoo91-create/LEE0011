@@ -19,7 +19,7 @@ export default function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 hidden w-[var(--sidebar-w,250px)] flex-col border-r border-gray-700 bg-gray-800 lg:flex">
       <p className="px-6 py-6 text-lg font-bold tracking-tight text-white">
-        My Dashboard
+        내 대시보드
       </p>
       <nav aria-label="메인 메뉴" className="flex flex-1 flex-col gap-1 px-3">
         {navItems.map(({ to, label, icon: Icon }) => (

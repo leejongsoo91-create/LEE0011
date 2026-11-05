@@ -5,7 +5,7 @@ import CalendarGrid from '../components/CalendarGrid.jsx'
 export default function Schedule() {
   return (
     <>
-      <NotionPage name="Schedule" columns={['이름', '날짜', '태그']} />
+      <NotionPage name="일정" columns={['이름', '날짜', '태그']} />
       <CalendarGrid />
     </>
   )

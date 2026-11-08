@@ -12,7 +12,7 @@ export const navItems = [
   { to: '/schedule', label: '일정', icon: CalendarDays, group: 'workspace' },
   { to: '/work', label: '업무', icon: Briefcase, group: 'workspace' },
   { to: '/hobbies', label: '취미', icon: Palette, group: 'workspace' },
-  { to: '/investments', label: '투자', icon: TrendingUp, group: 'workspace' },
+  { to: '/investments', label: '주식', icon: TrendingUp, group: 'workspace' },
   { to: '/control', label: '관제', icon: Radar, group: 'manage' },
 ]
 

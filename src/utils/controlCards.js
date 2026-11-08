@@ -56,7 +56,7 @@ export function buildControlCards({ summary, work, schedule, investments }, now 
       attention: agent ? agent.schedule.waiting + agent.schedule.attention : undefined,
     },
     {
-      title: '투자',
+      title: '주식',
       icon: TrendingUp,
       to: '/investments',
       isLoading: investments.isLoading,

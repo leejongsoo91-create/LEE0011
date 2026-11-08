@@ -24,8 +24,9 @@ const sources = (agent = null) => ({
   investments: rows([{ id: 1, ticker: 'AAPL', name: '애플' }, { id: 2, ticker: '005930', name: null }]),
 })
 
-test('업무·일정·투자 카드 숫자', () => {
+test('업무·일정·주식 카드 숫자', () => {
   const [, work, schedule, invest] = buildControlCards(sources(), now)
+  assert.equal(invest.title, '주식')
   assert.deepEqual([work.main.value, work.sub, work.items], [1, '할 일 1 · 완료 1', '보고서'])
   assert.deepEqual([schedule.main.value, schedule.sub, schedule.items], [2, '7일 안 1 · 오늘 지난 1', '다음: 19:00 저녁 약속'])
   assert.deepEqual([invest.main.value, invest.items], [2, '애플 · 005930'])

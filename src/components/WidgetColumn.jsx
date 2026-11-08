@@ -11,7 +11,7 @@ const widgetContents = {
 }
 
 // 위젯 안쪽 이름 → 화면에 보일 한글 제목
-const widgetTitles = { Schedule: '일정', Work: '업무', Hobbies: '취미', Investments: '투자' }
+const widgetTitles = { Schedule: '일정', Work: '업무', Hobbies: '취미', Investments: '주식' }
 
 // 드래그 가능한 위젯들이 세로로 쌓이는 한 개의 열
 export default function WidgetColumn({ id, titles }) {

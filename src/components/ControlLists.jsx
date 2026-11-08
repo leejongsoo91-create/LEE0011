@@ -4,7 +4,7 @@ import { formatAt } from '../utils/controlTime.js'
 // 중앙관제의 두 목록: 확인 필요, 최근 에이전트 작업. (서버 요약 /api/control-summary 의 attention·recent)
 
 const DEPT_LABELS = { schedule: '일정', invest: '투자', agents: '에이전트 설정', test: '테스트' }
-const AREA_LABELS = { agent: '에이전트', schedule: '일정', invest: '투자' }
+const AREA_LABELS = { agent: '에이전트', schedule: '일정', invest: '주식' }
 const STATUS_LABELS = {
   PLANNING: '계획 중',
   VALIDATING: '검증 중',

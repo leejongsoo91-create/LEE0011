@@ -4,7 +4,7 @@ import { LayoutGrid } from 'lucide-react'
 import { itemsOf, navGroups, navItemOf } from './navItems.js'
 
 // 헤더 오른쪽의 메뉴 버튼. 누르면 아래로 메뉴 패널이 열린다.
-// 패널 위쪽 탭: 워크스페이스(홈·일정·업무·취미·투자) / 관리(관제)
+// 패널 위쪽 탭: 워크스페이스(홈·일정·업무·취미·주식) / 관리(관제)
 // 메뉴를 고르거나, 바깥을 누르거나, Esc를 누르면 닫힌다.
 // 패널은 헤더 오른쪽 버튼 묶음(relative)의 오른쪽 끝에 맞춰 열린다. 폰에서 왼쪽으로 넘치지 않게.
 export default function WorkspaceMenu() {

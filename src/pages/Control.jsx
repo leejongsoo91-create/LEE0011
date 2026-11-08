@@ -8,7 +8,7 @@ import { formatAt } from '../utils/controlTime.js'
 
 // 중앙관제: 영역별로 진행 중·대기·확인 필요를 한 화면에서 본다. (보기 전용, 결재는 텔레그램에서)
 //   에이전트 카드·확인 필요·최근 작업 → /api/control-summary (서버가 agent_tasks를 요약)
-//   업무·일정·투자 카드 → 브라우저가 Supabase에서 직접 (RLS로 내 것만)
+//   업무·일정·주식 카드 → 브라우저가 Supabase에서 직접 (RLS로 내 것만)
 
 const newest = (rows) => rows.reduce((max, row) => (row.created_at > max ? row.created_at : max), '')
 

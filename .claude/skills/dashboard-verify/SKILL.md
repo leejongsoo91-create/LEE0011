@@ -27,7 +27,7 @@ description: 화면을 바꾼 작업을 마친 뒤, 또는 사용자가 "확인�
 5. `browser_console_messages`로 오류를 확인한다. 오류가 있으면 보고서에 그대로 적는다.
 6. 확인이 끝나면 개발 서버를 끈다 (직접 띄운 경우만).
 
-MCP 브라우저가 `spawn UNKNOWN`으로 안 뜨면(2026-11-09 이 PC에서 확인됨) CLI로 캡처만 한다. 콘솔 오류 확인은 못 하니 보고서에 그렇게 적는다.
+MCP 브라우저가 `spawn UNKNOWN`으로 안 뜨면: 이 PC는 Windows 스마트 앱 컨트롤이 켜져 있어 Playwright 전용 크로미움(`chrome.exe`)을 막는다 (2026-11-09 확인). 그래서 `~/.claude.json`의 playwright MCP를 `--browser msedge`로 바꿔 두었다. 그래도 안 뜨면 설정이 `chromium`으로 돌아가지 않았는지 보고, 급하면 CLI로 캡처만 한다 (CLI는 창 없는 headless라 막히지 않는다). 콘솔 오류 확인은 못 하니 보고서에 그렇게 적는다.
 ```bash
 npx -y playwright@1.65.0-alpha-2026-10-30 screenshot --browser chromium \
   --viewport-size "1366,800" --wait-for-timeout 3000 http://localhost:5173 <스크래치패드>/local-laptop.png

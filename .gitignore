@@ -2,3 +2,6 @@ node_modules
 dist
 .env.local
 .env*.local
+
+# Playwright MCP 화면 캡처 (확인용 임시 파일)
+.playwright-mcp/

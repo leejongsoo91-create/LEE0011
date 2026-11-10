@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import Header from './Header.jsx'
@@ -7,7 +7,19 @@ import AddItemModal from './AddItemModal.jsx'
 import ScheduleViewModal from './ScheduleViewModal.jsx'
 import DayEventsModal from './DayEventsModal.jsx'
 import CommandPalette from './CommandPalette.jsx'
+import Skeleton from './Skeleton.jsx'
 import useTheme from '../hooks/useTheme.js'
+
+// 화면 파일을 받는 동안 본문 자리에 보여 주는 스켈레톤 (머리글·하단 탭은 그대로 남는다)
+function PageFallback() {
+  return (
+    <div role="status" aria-label="화면을 불러오는 중" className="flex flex-col gap-3">
+      <Skeleton className="h-8 w-48" />
+      <Skeleton className="h-32 w-full" />
+      <Skeleton className="h-32 w-full" />
+    </div>
+  )
+}
 
 export default function Layout() {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -55,7 +67,9 @@ export default function Layout() {
       <div className="min-h-screen">
         <Header />
         <main className="@container p-4 pb-28 lg:p-8 lg:pb-24">
-          <Outlet />
+          <Suspense fallback={<PageFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
       <Fab onClick={() => setIsModalOpen(true)} />

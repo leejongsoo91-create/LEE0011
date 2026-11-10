@@ -1,14 +1,18 @@
+import { lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Login from './pages/Login.jsx'
-import Home from './pages/Home.jsx'
-import Control from './pages/Control.jsx'
-import Schedule from './pages/Schedule.jsx'
-import Work from './pages/Work.jsx'
-import Hobbies from './pages/Hobbies.jsx'
-import Investments from './pages/Investments.jsx'
-import Settings from './pages/Settings.jsx'
+
+// 화면은 열 때 받는다(처음 로딩을 가볍게). 받는 동안은 Layout의 Suspense가 스켈레톤을 보여 준다.
+// 로그인 화면은 가벼워서 처음부터 같이 받는다.
+const Home = lazy(() => import('./pages/Home.jsx'))
+const Control = lazy(() => import('./pages/Control.jsx'))
+const Schedule = lazy(() => import('./pages/Schedule.jsx'))
+const Work = lazy(() => import('./pages/Work.jsx'))
+const Hobbies = lazy(() => import('./pages/Hobbies.jsx'))
+const Investments = lazy(() => import('./pages/Investments.jsx'))
+const Settings = lazy(() => import('./pages/Settings.jsx'))
 
 // /login 외의 모든 경로는 로그인해야 볼 수 있고, 정의되지 않은 경로는 홈으로 이동시킨다.
 export default function App() {

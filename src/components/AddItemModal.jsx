@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import TitleInput from './TitleInput.jsx'
-import NotionEditor from './NotionEditor.jsx'
+import Skeleton from './Skeleton.jsx'
 import InvestmentFields from './InvestmentFields.jsx'
 import ScheduleFields from './ScheduleFields.jsx'
 import useItemSave from '../hooks/useItemSave.js'
 import { emptySchedule, scheduleFromRow } from '../utils/scheduleForm.js'
+
+// 블록 에디터는 크기가 커서, 이 창에서 에디터가 필요할 때 처음 받는다. (모든 화면에 실려 오지 않게)
+const NotionEditor = lazy(() => import('./NotionEditor.jsx'))
 
 // 노션 페이지처럼 큰 제목 입력칸과 블록 에디터를 가진 빠른 추가/편집 모달.
 // editing을 주면 기존 항목을 불러와 수정한다. 닫기 버튼, 배경 클릭, ESC 키로 닫을 수 있다.
@@ -74,10 +77,12 @@ export default function AddItemModal({ onClose, editing, prefill }) {
           <InvestmentFields values={investment} onChange={setInvestment} />
         ) : (
           <section aria-label="내용" className="min-h-48">
-            <NotionEditor
-              initialContent={editing?.row.content}
-              onDocumentChange={(doc) => (contentRef.current = doc)}
-            />
+            <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+              <NotionEditor
+                initialContent={editing?.row.content}
+                onDocumentChange={(doc) => (contentRef.current = doc)}
+              />
+            </Suspense>
           </section>
         )}
         <footer className="flex justify-end gap-2">

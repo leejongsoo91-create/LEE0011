@@ -122,7 +122,11 @@ Supabase **SQL Editor**에서 `supabase/migrations/` 폴더의 파일을 **순�
 | 2 | `20261021010000_add_user_id_and_auth_policies.sql` | `user_id` 추가, RLS(내 데이터만 접근) 적용 |
 | 3 | `20261022000000_create_pages_and_delete_account.sql` | `pages` 테이블, 계정 삭제 함수 `delete_my_account()` |
 | 4 | `20261023000000_add_schedule_time_and_reminders.sql` | 일정의 시간·알림 컬럼 |
-| 5 | `20261023010000_schedule_reminder_cron.sql` | (선택) 1분마다 알림 확인 예약 |
+| 5 | ~~`20261023010000_schedule_reminder_cron.sql`~~ | **건너뛰기.** 9번 파일이 대신함 (시크릿을 직접 적는 예전 방식이라 오류가 났음) |
+| 6 | `20261026000000_create_agent_tasks.sql` | 에이전트 작업·결재·로그 표 `agent_tasks` |
+| 7 | `20261030000000_schedule_agent_tasks.sql` | 일정의 에이전트 작업, 금고에 `cron_secret` 저장, 1분마다 `/api/agent-cron` 예약 (시크릿 한 곳만 바꿔 실행) |
+| 8 | `20261031000000_agent_settings.sql` | 에이전트 프로그램 매칭 표 |
+| 9 | `20261111000000_schedule_reminder_cron_vault.sql` | (선택) 1분마다 일정 알림 확인 예약. 7번의 금고 값을 쓰므로 바꿀 곳 없음 |
 
 ### 4. 로그인 설정
 
@@ -154,7 +158,14 @@ npm run preview   # 빌드 결과 미리보기
 
 - 알림은 Vercel **서버 함수**(`api/notify-schedule.js`, `api/send-reminders.js`)가 보냅니다. 봇 토큰이 브라우저 코드에 들어가지 않도록 `VITE_` 접두사 없이 **Vercel 환경변수**에만 등록합니다.
 - 등록 알림에 필요한 환경변수: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
-- 시간 맞춤 알림에 추가로 필요한 것: `CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` 환경변수, 그리고 Supabase `pg_cron`이 1분마다 서버 함수를 부르도록 하는 SQL(`20261023010000_schedule_reminder_cron.sql`, 주소와 시크릿을 내 값으로 바꿔 실행)
+- 시간 맞춤 알림에 추가로 필요한 것: `CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` 환경변수, 그리고 Supabase `pg_cron`이 1분마다 서버 함수를 부르도록 하는 SQL(`20261111000000_schedule_reminder_cron_vault.sql`). 시크릿은 금고(Vault)의 `cron_secret`에서 꺼내므로 SQL에 직접 적지 않습니다. 금고 값은 `20261030000000_schedule_agent_tasks.sql`이 넣고, Vercel의 `CRON_SECRET`과 같아야 합니다.
+- 시크릿을 바꿀 때: Vercel `CRON_SECRET`과 금고 `cron_secret` 두 곳만 같은 값으로 바꾸면 됩니다 (예약 SQL은 다시 실행할 필요 없음).
+- **등록 알림은 오는데 시각 알림이 안 올 때** (Supabase SQL Editor):
+  1. `select status_code, left(content::text, 80) as content, created from net._http_response order by created desc limit 4;`
+     - `{"checked":…}` 줄 = 일정 알림 예약, `{"status":"ok","swept":…}` 줄 = 에이전트 예약입니다.
+     - `{"checked":…}` 줄이 `200`이면 정상, `401`이면 금고 값과 Vercel 값이 다릅니다.
+  2. `{"checked":…}` 줄이 아예 없으면 예약이 SQL 단계에서 실패한 것입니다:
+     `select d.status, left(d.return_message, 120), d.start_time from cron.job_run_details d join cron.job j on j.jobid = d.jobid where j.jobname = 'schedule-reminders' order by d.start_time desc limit 3;`
 - 전송에 실패해도 일정 저장과 화면 동작에는 영향이 없고, 같은 알림이 두 번 가지 않습니다. 로컬 `npm run dev`에서는 서버 함수가 없어 알림이 가지 않습니다.
 
 ### 📲 스마트폰에 앱으로 설치

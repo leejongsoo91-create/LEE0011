@@ -66,7 +66,7 @@ function PageBody({ path, name, columns, table }) {
           onHeadingsChange={setHeadings}
         />
       </section>
-      <NotionTable name={name} columns={columns} />
+      {table ?? <NotionTable name={name} columns={columns} />}
       <TocPanel headings={headings} />
     </article>
   )

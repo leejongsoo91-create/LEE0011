@@ -5,12 +5,17 @@ import MeetingSummaryModal from './MeetingSummaryModal.jsx'
 import useRows from '../hooks/useRows.js'
 import useRowDelete from '../hooks/useRowDelete.js'
 import { meetingTime } from '../utils/meetingSummary.js'
+import { notifyDataChange } from '../lib/db.js'
 
 // 업무 페이지의 "회의 기록" 표: Plaud 녹음이 텔레그램 결재를 거쳐 들어온 회의들 (최신순).
 // 줄을 누르면 요약을 읽기 전용으로 보여준다. 회의 기록을 지워도 거기서 나온 칸반 카드는 남는다.
 export default function MeetingList() {
   const { rows, setRows, isLoading } = useRows('work_meetings')
-  const handleDelete = useRowDelete('work_meetings', setRows)
+  const deleteMeeting = useRowDelete('work_meetings', setRows)
+  // 지운 뒤 칸반 보드도 다시 불러와, 카드에 남은 회의 제목(🎙)을 바로 없앤다. (DB에서는 meeting_id가 비워진다)
+  const handleDelete = async (id) => {
+    if (await deleteMeeting(id)) notifyDataChange()
+  }
   const [open, setOpen] = useState(null)
 
   return (

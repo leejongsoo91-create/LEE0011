@@ -10,7 +10,7 @@ import { saveTitle } from '../utils/pageTitle.js'
 
 // 제목, 에디터, 표 블록, 우측 목차로 이루어진 노션 스타일 페이지.
 // 제목과 본문은 입력을 멈추면 Supabase에 자동 저장되고, 다른 기기에서도 같은 내용으로 열린다.
-// table을 넘기면 빈 표 블록 대신 그것을 보여준다. (업무 페이지의 회의 기록)
+// table을 넘기면 빈 표 블록 대신 그것을 보여준다. false를 넘기면 표 자리를 비운다. (업무 탭의 메모)
 export default function NotionPage({ name, columns, table }) {
   const { pathname } = useLocation()
   // 페이지가 바뀌면 불러오기·저장 상태를 새로 시작한다.

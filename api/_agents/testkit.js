@@ -18,7 +18,7 @@ export function installFakes({ mode = 'on' } = {}) {
   if (mode) process.env.AGENT_MODE = mode
   else delete process.env.AGENT_MODE
 
-  const tables = { agent_tasks: [], schedule: [], agent_settings: [], work: [], work_meetings: [], plaud_inbox: [] }
+  const tables = { agent_tasks: [], schedule: [], agent_settings: [], work: [], work_meetings: [], plaud_inbox: [], dev_log: [] }
   const fake = { tables, tasks: tables.agent_tasks, schedule: tables.schedule, users: [{ id: OWNER_UID }], sent: [], edits: [], answers: [], dbCalls: 0, failDb: false, failTelegram: false, failScheduleInsert: false, failSettingsWrite: false, failWorkInsert: false }
   let nextMessageId = 500
   const json = (body, status = 200) => new Response(JSON.stringify(body), { status })

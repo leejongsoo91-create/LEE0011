@@ -5,7 +5,7 @@ import Skeleton from './Skeleton.jsx'
 import EmptyState from './EmptyState.jsx'
 import useRows from '../hooks/useRows.js'
 import useRowDelete from '../hooks/useRowDelete.js'
-import { updateRow } from '../lib/db.js'
+import { notifyDataChange, updateRow } from '../lib/db.js'
 
 // 열 id는 DB의 status 값과 같고, 열마다 진행률(progress)이 정해져 있다.
 const statusColumns = [
@@ -22,7 +22,11 @@ export default function KanbanBoard() {
   const { rows: meetings } = useRows('work_meetings')
   const meetingTitles = Object.fromEntries(meetings.map((meeting) => [meeting.id, meeting.title]))
 
-  const handleDelete = useRowDelete('work', setRows)
+  const deleteWork = useRowDelete('work', setRows)
+  // 지우거나 옮긴 뒤 업무 요약 띠 같은 다른 목록도 다시 불러온다
+  const handleDelete = async (id) => {
+    if (await deleteWork(id)) notifyDataChange()
+  }
 
   const handleDragEnd = async ({ source, destination, draggableId }) => {
     if (!destination || destination.droppableId === source.droppableId) return
@@ -31,6 +35,7 @@ export default function KanbanBoard() {
     setRows((prev) => prev.map((row) => (row.id === draggableId ? { ...row, ...values } : row)))
     try {
       await updateRow('work', draggableId, values)
+      notifyDataChange()
       toast(`'${target.title}'(으)로 이동했습니다`)
     } catch {
       toast.error('변경 사항을 저장하지 못했습니다. 원래 상태로 되돌립니다')

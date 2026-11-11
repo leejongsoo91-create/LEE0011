@@ -1,9 +1,11 @@
-import { Bot, Briefcase, CalendarDays, TrendingUp } from 'lucide-react'
+import { Bot, Briefcase, CalendarDays, TrendingUp, UsersRound } from 'lucide-react'
 import { addDays, kstDate, kstTime } from './controlTime.js'
+import { STATE_STYLE, agoLabel, lastLogAt, teamStatus } from './teamStatus.js'
 
-// 중앙관제 영역 카드 4개의 숫자를 만든다. (화면 설계 표의 기준)
-//   summary: useControlSummary() 결과, work·schedule·investments: useRows() 결과
-export function buildControlCards({ summary, work, schedule, investments }, now = new Date()) {
+// 중앙관제 영역 카드의 숫자를 만든다. (화면 설계 표의 기준)
+//   summary: useControlSummary() 결과, work·schedule·investments·devLog: useRows() 결과
+//   devLog(개발 팀 기록)가 없으면 개발 팀 카드는 빼고 4장만 만든다.
+export function buildControlCards({ summary, work, schedule, investments, devLog }, now = new Date()) {
   const agent = summary.data
 
   // 업무
@@ -65,5 +67,22 @@ export function buildControlCards({ summary, work, schedule, investments }, now 
       items: investments.rows.slice(0, 3).map((row) => row.name || row.ticker).join(' · '),
       attention: agent?.invest.failedToday,
     },
+    ...(devLog ? [devTeamCard(devLog, now)] : []),
   ]
+}
+
+// 개발 팀(Lead Coder · QA · DevOps) 카드: 작업 중인 수, 마지막 기록, 각자 상태 기호. 실패는 확인 필요로 센다.
+function devTeamCard(devLog, now) {
+  const members = teamStatus(devLog.rows, now.getTime())
+  const last = lastLogAt(devLog.rows)
+  return {
+    title: '개발 팀',
+    icon: UsersRound,
+    to: '/work',
+    isLoading: devLog.isLoading,
+    main: { value: members.filter((member) => member.state === 'running').length, label: '작업 중' },
+    sub: last ? `마지막 기록 ${agoLabel(last, now.getTime())}` : '기록 없음',
+    items: members.map((member) => `${member.name.split('/')[0]} ${STATE_STYLE[member.state].icon}`).join(' · '),
+    attention: members.filter((member) => member.state === 'fail').length,
+  }
 }

@@ -13,8 +13,21 @@ async function getUserId() {
   return userId
 }
 
-// 내 목록 조회 (최신순). 데이터가 없으면 빈 배열을 돌려준다.
+// 같은 표를 여러 화면 조각이 동시에 부르면(예: 업무 탭의 요약 띠·회의 기록·칸반) 요청 하나를 같이 쓴다.
+const inflight = new Map()
+
+// 내 목록 조회 (최신순). 데이터가 없으면 빈 배열을 돌려준다. 부른 쪽마다 배열 복사본을 준다.
 export async function listRows(table) {
+  if (!inflight.has(table)) {
+    const request = fetchRows(table).finally(() => {
+      if (inflight.get(table) === request) inflight.delete(table)
+    })
+    inflight.set(table, request)
+  }
+  return [...(await inflight.get(table))]
+}
+
+async function fetchRows(table) {
   const userId = await getUserId()
   const { data, error } = await getClient()
     .from(table)
@@ -48,7 +61,9 @@ export async function deleteRow(table, id) {
 }
 
 // 데이터가 바뀌었음을 화면의 목록들에 알려 다시 불러오게 한다.
+// 쓰기 전에 시작된 요청을 같이 쓰면 옛 데이터를 받으므로, 알리기 전에 진행 중인 요청 공유를 끊는다.
 export function notifyDataChange() {
+  inflight.clear()
   window.dispatchEvent(new Event('datachange'))
 }
 

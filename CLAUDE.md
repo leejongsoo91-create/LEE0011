@@ -40,6 +40,8 @@
 
 - 코드 주석과 커밋 메시지는 한국어.
 - 커밋 전에 관련 테스트를 모두 통과시킨다. 테스트 실행은 `test-runner` 에이전트에 맡길 수 있다.
+- 커밋 전에 검토 에이전트(Agent)에게 독립 검토를 맡기고, 지적은 고친 뒤 재검토를 받는다.
+- 단계가 끝날 때마다 `node scripts/dev-log.mjs <agent> <kind> <status> "한 줄 요약" [ref]`로 업무 탭 "개발 팀"에 기록한다 (계획 승인·수정·테스트·검토 결과·커밋·배포 확인). 요약에 비밀 값·코드 본문·녹취록을 넣지 않는다. 기록 실패는 작업을 막지 않는다.
 - 주제별 규칙은 `.claude/rules/` (해당 폴더를 작업할 때 읽힌다): 에이전트 `agents.md`, 화면 `frontend.md`, DB `supabase.md`
 - 절차는 `.claude/skills/`: 새 부서 추가 `add-department`, 배포 후 확인 `deploy-check`, 화면 확인 `dashboard-verify`
 - **확인 도구는 무료만**: Playwright MCP, Aside는 `repl`·`browser_profiles`만 (`exec`는 AI 모델 호출이라 settings.json에서 막음). 비용이 드는 호출은 먼저 묻는다.

@@ -48,3 +48,18 @@ test('에이전트 요약이 없으면 —, 있으면 숫자와 확인 필요', 
   assert.equal(schedule.attention, 2)
   assert.deepEqual([invest.sub, invest.attention], ['오늘 조회 4', 0])
 })
+
+test('개발 팀 카드: 기록이 있을 때만, 작업 중 수·마지막 기록·실패는 확인 필요', () => {
+  assert.equal(buildControlCards(sources(), now).length, 4)
+  const devLog = rows([
+    { agent: 'lead', status: 'running', created_at: '2026-11-06T02:55:00Z' },
+    { agent: 'qa', status: 'fail', created_at: '2026-11-06T01:00:00Z' },
+  ])
+  const dev = buildControlCards({ ...sources(), devLog }, now).at(-1)
+  assert.equal(dev.title, '개발 팀')
+  assert.equal(dev.to, '/work')
+  assert.equal(dev.main.value, 1)
+  assert.equal(dev.sub, '마지막 기록 5분 전')
+  assert.equal(dev.items, 'Lead Coder ● · QA ✘ · DevOps —')
+  assert.equal(dev.attention, 1)
+})

@@ -8,7 +8,7 @@ import { formatAt } from '../utils/controlTime.js'
 
 // 중앙관제: 영역별로 진행 중·대기·확인 필요를 한 화면에서 본다. (보기 전용, 결재는 텔레그램에서)
 //   에이전트 카드·확인 필요·최근 작업 → /api/control-summary (서버가 agent_tasks를 요약)
-//   업무·일정·주식 카드 → 브라우저가 Supabase에서 직접 (RLS로 내 것만)
+//   업무·일정·주식·개발 팀 카드 → 브라우저가 Supabase에서 직접 (RLS로 내 것만)
 
 const newest = (rows) => rows.reduce((max, row) => (row.created_at > max ? row.created_at : max), '')
 
@@ -17,12 +17,13 @@ export default function Control() {
   const work = useRows('work')
   const schedule = useRows('schedule')
   const investments = useRows('investments')
+  const devLog = useRows('dev_log')
   const agent = summary.data
 
-  const cards = buildControlCards({ summary, work, schedule, investments })
-  const lastChange = [agent?.updatedAt ?? '', newest(work.rows), newest(schedule.rows), newest(investments.rows)].sort().at(-1)
+  const cards = buildControlCards({ summary, work, schedule, investments, devLog })
+  const lastChange = [agent?.updatedAt ?? '', newest(work.rows), newest(schedule.rows), newest(investments.rows), newest(devLog.rows)].sort().at(-1)
 
-  const reloadAll = () => [summary, work, schedule, investments].forEach((source) => source.reload())
+  const reloadAll = () => [summary, work, schedule, investments, devLog].forEach((source) => source.reload())
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-8 pb-4">
@@ -47,7 +48,7 @@ export default function Control() {
         <h3 id="control-overview" className="text-lg font-semibold text-white">
           전체 현황 <span className="ml-1 text-sm font-normal text-gray-400">진행 중 · 대기 · 확인 필요</span>
         </h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {cards.map((card) => (
             <ControlCard key={card.title} {...card} />
           ))}

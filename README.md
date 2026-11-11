@@ -127,6 +127,8 @@ Supabase **SQL Editor**에서 `supabase/migrations/` 폴더의 파일을 **순�
 | 7 | `20261030000000_schedule_agent_tasks.sql` | 일정의 에이전트 작업, 금고에 `cron_secret` 저장, 1분마다 `/api/agent-cron` 예약 (시크릿 한 곳만 바꿔 실행) |
 | 8 | `20261031000000_agent_settings.sql` | 에이전트 프로그램 매칭 표 |
 | 9 | `20261111000000_schedule_reminder_cron_vault.sql` | (선택) 1분마다 일정 알림 확인 예약. 7번의 금고 값을 쓰므로 바꿀 곳 없음 |
+| 10 | `20261112000000_work_meetings_plaud.sql` | 업무 탭 회의 기록(`work_meetings`)·Plaud 받은함(`plaud_inbox`), 업무 카드에 회의·담당자·마감일 칸 |
+| 11 | `20261113000000_dev_log.sql` | 업무 탭 "개발 팀" 작업 기록(`dev_log`), 30일 지난 기록 매일 정리 예약 |
 
 ### 4. 로그인 설정
 
@@ -177,11 +179,24 @@ npm run preview   # 빌드 결과 미리보기
 
 ---
 
+## 👥 개발 팀 현황판 (업무 탭)
+
+업무 탭 위쪽 "개발 팀"에 Lead Coder · QA/Reviewer · DevOps/Monitor의 상태와 작업 로그가 보입니다. 실시간 연결이 아니라, 노트북의 Claude Code가 단계마다 남긴 기록으로 상태를 계산합니다 (30분 넘게 기록이 없으면 "대기", 마지막이 실패면 "실패" 유지).
+
+1. SQL 11번 실행
+2. 무작위 문자열(32자 이상)을 Vercel 환경변수 `DEV_LOG_SECRET`과 노트북 Windows 사용자 환경변수 `DEV_LOG_SECRET`에 똑같이 넣기
+3. 기록 보내기: `node scripts/dev-log.mjs <lead|qa|devops> <plan|edit|test|review|commit|deploy|check> <running|pass|fail|info> "한 줄 요약" [커밋 해시 또는 https 주소]`
+
+QA 실패와 배포 실패는 텔레그램으로도 알립니다. 요약에 비밀 값처럼 보이는 글자가 있으면 저장하지 않습니다.
+
+---
+
 ## 📁 프로젝트 구조
 
 ```text
 ├── public/                  # PWA 아이콘
 ├── supabase/migrations/     # 데이터베이스 SQL (순서대로 실행)
+├── scripts/dev-log.mjs      # 개발 팀 작업 기록 보내기 (노트북에서)
 ├── docs/SPEC.md             # 초기 기획서(UI 뼈대 단계)
 └── src/
     ├── components/          # Layout, Sidebar, BottomTab, KanbanBoard, NotionEditor 등

@@ -1,6 +1,7 @@
 // Vercel 함수: 일정 자동 작업 크론 입구. Supabase pg_cron이 1분마다 호출한다.
 //   (supabase/migrations/20261030000000_schedule_agent_tasks.sql)
 // 하는 일: ① 남은 작업 정리(만료·멈춤) ② 때가 된 일정의 에이전트 작업을 계획해 텔레그램으로 결재 요청
+//          ③ Plaud 받은함(plaud_inbox)의 회의 녹음을 결재 요청으로 (plaudTrigger.js, AI 미사용)
 //
 // 보안: 인터넷에 열린 주소라서, CRON_SECRET을 가진 호출만 DB·AI·텔레그램에 닿게 한다.
 //   1) CRON_SECRET이 없거나 32자보다 짧거나 앞뒤에 공백이 있으면 → 503 (설정이 약하면 열지 않는다)
@@ -13,6 +14,7 @@
 
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { sweepStale } from './_agents/orchestrator.js'
+import { runPlaudInbox } from './_agents/plaudTrigger.js'
 import { runScheduleTriggers } from './_agents/scheduleTrigger.js'
 
 export const MIN_SECRET_LENGTH = 32
@@ -51,12 +53,21 @@ export default async function handler(req, res) {
     console.error('[agent-cron] 남은 작업 정리 실패', error)
   }
 
+  // Plaud 받은함은 일정 자동 작업과 따로 처리한다 (한쪽이 실패해도 다른 쪽은 돈다)
+  let plaud = null
+  try {
+    plaud = await runPlaudInbox({ chatId })
+  } catch (error) {
+    console.error('[agent-cron] Plaud 받은함 처리 실패', error)
+    plaud = { error: true }
+  }
+
   try {
     const result = await runScheduleTriggers({ chatId })
-    return res.status(200).json({ status: 'ok', swept: swept.length, ...result })
+    return res.status(200).json({ status: 'ok', swept: swept.length, ...result, plaud })
   } catch (error) {
     // 텔레그램으로는 보내지 않는다: 1분마다 같은 오류 알림이 쌓이지 않게. 작업이 중간에 멈췄다면 5분 뒤 STALLED 알림이 간다.
     console.error('[agent-cron] 자동 작업 처리 실패', error)
-    return res.status(200).json({ status: 'error', swept: swept.length })
+    return res.status(200).json({ status: 'error', swept: swept.length, plaud })
   }
 }

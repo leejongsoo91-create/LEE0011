@@ -2,9 +2,17 @@ import { Draggable, Droppable } from '@hello-pangea/dnd'
 import ProgressBar from './ProgressBar.jsx'
 import DeleteButton from './DeleteButton.jsx'
 import { openItemEditor } from '../utils/itemEditor.js'
+import { dueLabel } from '../utils/meetingSummary.js'
+
+// 카드 아래 작은 글씨: 담당자 · 마감일 · 나온 회의 (Plaud 회의에서 만든 카드만 있음)
+function CardMeta({ card, meetingTitle }) {
+  const parts = [card.assignee, dueLabel(card.due_date), meetingTitle ? `🎙 ${meetingTitle}` : null].filter(Boolean)
+  if (parts.length === 0) return null
+  return <p className="mb-2 break-words text-xs text-gray-400">{parts.join(' · ')}</p>
+}
 
 // 칸반의 한 열: 제목과 드래그 가능한 카드 목록
-export default function KanbanColumn({ column, onDelete }) {
+export default function KanbanColumn({ column, onDelete, meetingTitles = {} }) {
   return (
     <section aria-label={column.title} className="rounded-xl bg-gray-800 p-3">
       <h3 className="mb-3 px-1 text-sm font-medium text-gray-400">
@@ -32,6 +40,7 @@ export default function KanbanColumn({ column, onDelete }) {
                     }`}
                   >
                     <p className="mb-2 pr-6 lg:pr-0">{card.title || '제목 없음'}</p>
+                    <CardMeta card={card} meetingTitle={meetingTitles[card.meeting_id]} />
                     <DeleteButton onDelete={() => onDelete(card.id)} label={`${card.title || '제목 없음'} 삭제`} className="absolute right-1.5 top-1.5 bg-gray-900" />
                     <ProgressBar progress={card.progress} />
                   </li>

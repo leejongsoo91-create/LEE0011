@@ -119,7 +119,8 @@ SQL: `supabase/migrations/20261026000000_create_agent_tasks.sql`. 서비스 롤 
 agent_architecture.md            이 문서
 api/
   webhook.js                     스위치(AGENT_MODE)가 꺼져 있으면 echo, 켜져 있으면 approval.js로 연결
-  agent-cron.js                  일정 자동 작업 크론 입구 (pg_cron 1분마다, CRON_SECRET 검증 → 남은 작업 정리 → 자동 작업 1개)
+  agent-cron.js                  일정 자동 작업 크론 입구 (pg_cron 1분마다, CRON_SECRET 검증 → 남은 작업 정리 → Plaud 받은함 → 자동 작업 1개)
+  plaud-hook.js                  Plaud 회의 녹음 입구 (Zapier Code 단계가 호출, PLAUD_HOOK_SECRET 검증 → plaud_inbox에 넣고 바로 응답)
   control-summary.js             중앙관제 화면(/control)용 작업 요약 (GET, 로그인 토큰 → 주인만, 개수·짧은 목록만. 계획 원문 없음)
   _agents/
     approval.js                  텔레그램 입구: 새 지시 · [승인]/[반려] 버튼 · 반려 사유 답장 · 운영 명령 분기
@@ -127,6 +128,8 @@ api/
     orchestrator.js              PLANNING→VALIDATING(상의)→PENDING/자동 승인, 시간 예산, 남은 작업 정리
     control.js                   중앙관제 요약: 최근 7일 작업의 상태별 개수, 확인 필요(FAILED·INTERRUPTED·STALLED·STEP_UNCERTAIN), 최근 10건
     scheduleTrigger.js           일정 자동 작업: 때가 된 일정 찾기, source_key, 놓친 작업(MISSED), planAndRoute 호출
+    plaud.js                     Plaud 요약 → 업무 등록 인자: 할 일 뽑기(- [ ] 줄), 시각(한국 시각으로 읽음), 중복 키 plaud:<해시>
+    plaudTrigger.js              Plaud 받은함 → 코드가 만든 계획(AI 미사용) → 검증 → 결재(24시간). 반려 = 버리기(approval.js)
     agents.config.js             역할별 설정: 메인·크로스체크 프로그램 자리, 모델, 시간 한도, 상의 횟수. 순서: 저장값(agent_settings) → 환경변수 → 기본값
     settings.js                  agent_settings(한 줄) 읽기·저장, 고를 수 있는 프로그램·모델 허용 목록
     planner.js                   메인 에이전트: 프로그램(anthropic|test) 선택, Anthropic 계획 작성(규칙서·라우팅 자리·상의 반영)
@@ -142,6 +145,7 @@ api/
       invest/                    투자 부서(조회만): tools.js(invest.quote·chart_summary·news·disclosures·brief·report) · rules.md
                                  resolve.js(종목 찾기) · format.js(기준 시각·구형 데이터 경고) · providers/(none·sample·stockview)
       agents/                    에이전트 설정 부서: agents.set_matching (매칭 변경, 결재)
+      work/                      업무 부서: work.import_meeting (회의 기록 + 할 일 카드, 결재, AI에게 안 보임) · rules.md
       test/                      테스트 팀: 가짜 도구 3개 (규칙서 없음)
     report.js                    텔레그램 문장 템플릿 (결재 요청·결과 보고·검증 실패·중단 알림)
     errors.js                    오류 → 텔레그램에 보일 원인 한 줄 (비밀 값 제외)
@@ -220,6 +224,7 @@ where e ? 'usage' group by 1, 2 order by 1, 2;
 | 5 (마지막) | 에이전트 프로그램 매칭을 결재로: 에이전트 설정 부서(`agents.set_matching`), `agent_settings` 표(SQL `20261031000000`), Anthropic 크로스체크 프로그램 — **완료**: 자동 테스트 123개 통과, 실제 환경(10/31)에서 결재로 매칭 변경 확인 | 텔레그램으로 "메인을 Opus 5.5로 바꿔줘" → 결재 → ✅ → `/help`에 반영, 같은 방법으로 원복 |
 | 투자 부서 | StockView 기준 조회 부서: 시세·차트 요약·뉴스·공시·시장 브리핑, 데이터 공급자 자리(`INVEST_PROVIDER`: none·sample·stockview, `STOCKVIEW_URL`), 기본값(차트 3개월·뉴스/브리핑 오늘), 24시간 구형 데이터 경고, market_type(US/KR) — **구현·자동 테스트 136개 통과**, 실제 환경(11/6, `INVEST_PROVIDER=sample`)에서 시세·차트·뉴스·공시·브리핑·여러 후보·미국 공시 안내·투자 판단 거절 8가지 확인 완료 | 텔레그램 "삼성전자 지금 얼마야?"·"시장 브리핑 해줘" → 결재 없이 보고, 🧪 예시 표시 |
 | 중앙관제 화면 | 대시보드 `/control`: 영역 카드 4개(에이전트·업무·일정·투자), 확인 필요, 최근 에이전트 작업. 에이전트 숫자는 `/api/control-summary`(주인만, 보기 전용) — **구현·자동 테스트 143개 통과** | 폰에서 Control 탭 → 결재 대기·완료 숫자가 텔레그램 작업과 맞음 |
+| 업무 탭 + Plaud | Plaud 요약 완료 → Zapier(무료, Instant 트리거 + Code 단계) → `/api/plaud-hook` → `plaud_inbox` → 크론이 코드로 계획 → 텔레그램 결재(24시간, 반려 = 버리기) → `work_meetings` 1건 + `work` 할 일 카드. 녹취록은 저장 안 함. SQL `20261112000000` — **구현·자동 테스트 164개 통과** (11-12) | 녹음이 끝나면 🎙 결재가 오고, 승인하면 업무 탭에 회의 기록과 카드가 생김, 같은 녹음은 한 번만 |
 | 종목 리포트 | `invest.report`: 종목 하나를 물으면 가격·3개월 흐름·뉴스 3건·오늘 공시(국내)를 한 보고로, 조각 하나가 실패해도 나머지는 보고, "삼성전자리포트"처럼 붙여 써도 종목을 찾음, 투자 판단 안 함 — **구현·자동 테스트 149개 통과**, 실제 환경(11/6, 예시 데이터)에서 붙여 쓴 이름·미국 공시 안내·정리해줘·사도 돼·뉴스만·관제 조회 수 6가지 확인 완료 | 텔레그램 "삼성전자리포트" → 결재 없이 📊 리포트 |
 
 ## 12. 열린 항목

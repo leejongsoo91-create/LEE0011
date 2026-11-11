@@ -15,7 +15,7 @@ import { friendlyReason } from './errors.js'
 import { executePlan } from './executor.js'
 import { hashPlan } from './plan.js'
 import { mainProgram } from './planner.js'
-import { approvalButtons, approvalText, clarificationText, scheduleHeader, executionReport, interruptedText, stalledText, validationFailedText } from './report.js'
+import { approvalButtons, approvalText, clarificationText, scheduleHeader, executionReport, interruptedText, stalledText, ttlLabel, validationFailedText } from './report.js'
 import { loadRules, rulesStatus } from './rules.js'
 import { sendMessage } from './telegram.js'
 import { appendLog, createTask, lastLogAt, listOpenTasks, transition } from './tasks.js'
@@ -248,7 +248,7 @@ export async function sweepStale(chatId, now = Date.now()) {
         await sendMessage(chatId, stalledText(failed))
       }
     } else if (task.status === 'PENDING' && task.expires_at && Date.parse(task.expires_at) <= now) {
-      if (await transition(task, 'FAILED', { log: { agent: 'orchestrator', event: 'EXPIRED', note: '결재 대기 시간(30분) 초과' } })) closed.push('expired')
+      if (await transition(task, 'FAILED', { log: { agent: 'orchestrator', event: 'EXPIRED', note: `결재 대기 시간(${ttlLabel(task)}) 초과` } })) closed.push('expired')
     } else if (task.status === 'REJECTED' && now - lastLogAt(task) > REASON_TTL_MS) {
       if (await transition(task, 'FAILED', { log: { agent: 'orchestrator', event: 'REASON_TIMEOUT', note: '반려 사유를 30분 동안 받지 못함' } })) {
         closed.push('reason-timeout')

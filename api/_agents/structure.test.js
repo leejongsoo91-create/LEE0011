@@ -18,7 +18,9 @@ beforeEach(() => {
 const send = (text) => handleUpdate(message(text, { updateId: updateId++ }))
 
 test('부서 플러그인: depts/index.js 목록으로 부서·도구가 만들어지고, 도구마다 dept가 붙는다', () => {
-  assert.deepEqual(DEPARTMENTS.map((d) => d.id), ['schedule', 'invest', 'agents', 'test'])
+  assert.deepEqual(DEPARTMENTS.map((d) => d.id), ['schedule', 'invest', 'agents', 'work', 'test'])
+  assert.deepEqual(departments.work.tools, ['work.import_meeting'])
+  assert.equal(tools['work.import_meeting'].aiVisible, false, 'Plaud 등록 도구는 AI에게 보이지 않는다')
   assert.deepEqual(departments.schedule.tools, ['schedule.list', 'schedule.create'])
   assert.equal(tools['schedule.create'].dept, 'schedule')
   assert.equal(tools['test.fail_write'].dept, 'test')
@@ -26,20 +28,20 @@ test('부서 플러그인: depts/index.js 목록으로 부서·도구가 만들�
 })
 
 test('부서 플러그인: 새 부서는 등록 정보만으로 붙고, 잘못된 등록은 막힌다', () => {
-  const extra = { id: 'work', name: '업무 부서', tools: { 'work.list': { label: '업무 조회', risk: 'read', check: () => null, run: async () => ({}) } } }
+  const extra = { id: 'hobby', name: '취미 부서', tools: { 'hobby.list': { label: '취미 조회', risk: 'read', check: () => null, run: async () => ({}) } } }
   const built = buildRegistry([...DEPARTMENTS, extra])
-  assert.equal(built.tools['work.list'].dept, 'work')
-  assert.throws(() => buildRegistry([{ id: 'work', tools: { 'list': {} } }]), /"work\."로 시작/)
+  assert.equal(built.tools['hobby.list'].dept, 'hobby')
+  assert.throws(() => buildRegistry([{ id: 'hobby', tools: { 'list': {} } }]), /"hobby\."로 시작/)
   assert.throws(() => buildRegistry([extra, extra]), /부서 id 중복/)
   assert.throws(() => buildRegistry([{ id: 'Work!', tools: {} }]), /부서 id가 잘못됨/)
-  assert.throws(() => buildRegistry([extra, { id: 'work2', tools: { 'work.list': {} } }]), /"work2\."로 시작/)
+  assert.throws(() => buildRegistry([extra, { id: 'hobby2', tools: { 'hobby.list': {} } }]), /"hobby2\."로 시작/)
 })
 
 test('부서 규칙서: 부서 폴더의 rules.md를 읽고, 상태도 부서 목록을 따른다', () => {
   const rules = loadRules()
   assert.match(rules.depts.schedule, /# 일정 부서 규칙/)
   assert.equal(rules.depts.test, undefined, '규칙서가 없는 부서는 빠진다')
-  assert.deepEqual(rulesStatus(rules), { global: true, deptTemplate: true, depts: { schedule: true, invest: true, agents: true } })
+  assert.deepEqual(rulesStatus(rules), { global: true, deptTemplate: true, depts: { schedule: true, invest: true, agents: true, work: true } })
   const vercel = JSON.parse(readFileSync(new URL('../../vercel.json', import.meta.url), 'utf8'))
   assert.equal(vercel.functions['api/webhook.js'].includeFiles, 'api/_agents/**/*.md')
 })

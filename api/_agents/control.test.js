@@ -114,6 +114,9 @@ test('확인 필요 이유: 성공·대기·반려는 해당 없음', () => {
   assert.equal(attentionReason(task({ status: 'PENDING' })), null)
   assert.equal(attentionReason(task({ status: 'REJECTED' })), null)
   assert.equal(attentionReason(task({ status: 'FAILED' })), '실패')
+  const discarded = task({ status: 'FAILED' })
+  discarded.event_logs = [...(discarded.event_logs ?? []), { agent: 'captain', event: 'DISCARDED' }]
+  assert.equal(attentionReason(discarded), null, 'Plaud 녹음을 반려해 버린 것은 확인 필요가 아니다')
 })
 
 test('작업이 없으면 0과 빈 목록', () => {

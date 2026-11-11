@@ -18,6 +18,9 @@ const statusColumns = [
 // 카드를 다른 열로 끌면 status와 progress(0/50/100)가 DB에 함께 저장된다.
 export default function KanbanBoard() {
   const { rows, setRows, isLoading, reload } = useRows('work')
+  // 카드에 어느 회의에서 나왔는지 보여 주려고 회의 제목을 함께 읽는다
+  const { rows: meetings } = useRows('work_meetings')
+  const meetingTitles = Object.fromEntries(meetings.map((meeting) => [meeting.id, meeting.title]))
 
   const handleDelete = useRowDelete('work', setRows)
 
@@ -57,6 +60,7 @@ export default function KanbanBoard() {
               <KanbanColumn
                 key={column.id}
                 onDelete={handleDelete}
+                meetingTitles={meetingTitles}
                 column={{ ...column, cards: rows.filter((row) => row.status === column.id) }}
               />
             ))}

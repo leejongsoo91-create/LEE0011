@@ -3,6 +3,7 @@
 import { describePlan } from './plan.js'
 import { friendlyReason } from './errors.js'
 import { deptName, getTool } from './registry.js'
+import { isPlaudTask, whenLabel } from './plaud.js'
 
 const MAX_QUERY_SHOWN = 300
 const TEST_NOTE = '🧪 테스트 도구만 쓰는 계획이라 실제 데이터는 바뀌지 않습니다.'
@@ -17,7 +18,9 @@ const onlyReadSteps = (plan) => (plan?.steps ?? []).every((step) => getTool(step
 const dataNote = (plan) => (onlyTestTools(plan) ? TEST_NOTE : onlyReadSteps(plan) ? READ_NOTE : REAL_NOTE)
 // 누가 계획했는지 (메인 에이전트 프로그램)
 const plannerLine = (plan) =>
-  plan?.main?.program === 'anthropic'
+  plan?.main?.program === 'code'
+    ? '⚙️ 계획: 코드가 자동으로 작성 (AI 미사용)'
+    : plan?.main?.program === 'anthropic'
     ? `🤖 메인: Anthropic (${plan.main.model})`
     : plan?.main?.program === 'test' || plan?.testMode
       ? '🧪 메인: 테스트 계획 작성기 (AI 아님)'
@@ -72,14 +75,29 @@ export function scheduleHeader(task, { ask = false } = {}) {
   ]
 }
 
+// 결재 대기 시간: Plaud 자동 수신은 24시간(녹음은 밤에도 끝난다), 그 밖은 30분
+export const ttlLabel = (task) => (isPlaudTask(task) ? '24시간' : '30분')
+
+// Plaud 녹음에서 자동으로 시작한 작업이면 맨 위에 붙는 알림 줄
+export function plaudHeader(task) {
+  if (!isPlaudTask(task)) return []
+  const origin = task?.event_logs?.[0]?.origin
+  return [`🎙 [Plaud 회의 녹음] '${origin?.title ?? ''}' (${origin?.when ?? '시각 모름'})`, '업무 탭에 넣을까요? 반려하면 넣지 않고 끝내요.', '']
+}
+
+const deadlineLine = (task) =>
+  isPlaudTask(task)
+    ? `⏰ ${whenLabel(task.expires_at)}까지 결정해 주세요 (${ttlLabel(task)} 뒤 만료)`
+    : `⏰ ${kst(task.expires_at)}까지 결정해 주세요 (${ttlLabel(task)} 뒤 만료)`
+
 export function approvalText(task, rules) {
-  const lines = [...scheduleHeader(task, { ask: true }), '📝 [결재 요청]', `지시: ${queryOf(task)}`]
+  const lines = [...scheduleHeader(task, { ask: true }), ...plaudHeader(task), '📝 [결재 요청]', `지시: ${queryOf(task)}`]
   if (task.reject_count > 0) lines.push(`🔁 재계획 ${task.reject_count}회차 · 반려 사유: ${task.feedback ?? '(없음)'}`)
   if (task.plan_payload?.summary) lines.push(`요약: ${task.plan_payload.summary}`)
   lines.push('', '계획:', describePlan(task.plan_payload), '')
   lines.push(...[deptsLine(task.plan_payload), plannerLine(task.plan_payload), crosscheckLine(task.plan_payload)].filter(Boolean))
   if (rules) lines.push(rulesLine(rules))
-  lines.push(`⏰ ${kst(task.expires_at)}까지 결정해 주세요 (30분 뒤 만료)`)
+  lines.push(deadlineLine(task))
   lines.push(dataNote(task.plan_payload))
   return lines.join('\n')
 }

@@ -12,7 +12,8 @@ import {
 import { hashPlan } from './plan.js'
 import { handleCommand, parseCommand } from './commands.js'
 import { friendlyReason } from './errors.js'
-import { REASON_PROMPT, approvalText, errorText } from './report.js'
+import { isPlaudTask } from './plaud.js'
+import { REASON_PROMPT, approvalText, errorText, ttlLabel } from './report.js'
 import { answerCallbackQuery, editMessageText, forceReply, sendMessage } from './telegram.js'
 import { appendLog, findAwaitingReason, getTask, isTaskId, transition } from './tasks.js'
 
@@ -124,9 +125,9 @@ async function routeCallback(callback, chatId) {
 
   // 검사 2: 만료 전인가
   if (new Date(task.expires_at).getTime() <= Date.now()) {
-    await transition(task, 'FAILED', { log: { agent: 'intake', event: 'EXPIRED', note: '결재 대기 시간(30분) 초과' } }).catch(() => null)
+    await transition(task, 'FAILED', { log: { agent: 'intake', event: 'EXPIRED', note: `결재 대기 시간(${ttlLabel(task)}) 초과` } }).catch(() => null)
     await reply('만료된 결재예요')
-    await close(`⏰ 만료됨: 30분 안에 결정하지 않아 취소되었습니다.\n지시: ${task.task_query}`)
+    await close(`⏰ 만료됨: ${ttlLabel(task)} 안에 결정하지 않아 취소되었습니다.\n지시: ${task.task_query}`)
     return 'expired'
   }
 
@@ -162,6 +163,14 @@ async function routeCallback(callback, chatId) {
     await close(`✅ 승인됨 — 실행 결과는 아래 메시지로 보내요\n지시: ${task.task_query}`)
     const ran = await guard(chatId, () => runApproved(updated, chatId), { executing: true })
     return ran === 'error' ? 'error' : 'approved'
+  }
+
+  // Plaud 자동 수신 작업은 반려 = 버리기. 재계획할 지시가 없고(코드가 만든 계획), AI 비용도 들지 않게 한다.
+  if (isPlaudTask(task)) {
+    await transition(updated, 'FAILED', { log: { agent: 'captain', event: 'DISCARDED', note: 'Plaud 녹음 반려: 업무에 넣지 않음' } })
+    await reply('반려했어요. 업무에 넣지 않아요')
+    await close(`❌ 반려됨: 업무 탭에 넣지 않았어요\n지시: ${task.task_query}`)
+    return 'discarded'
   }
 
   // 반려: 한도를 넘으면 종료, 아니면 사유를 답장으로 받는다.

@@ -41,6 +41,8 @@ export function attentionReason(task) {
   const events = (task.event_logs ?? []).map((entry) => entry?.event)
   if (events.includes('STEP_UNCERTAIN')) return ATTENTION_REASONS.STEP_UNCERTAIN
   if (task.status !== 'FAILED') return null
+  // Plaud 녹음을 캡틴이 반려해 버린 것은 실패가 아니라 결정이다
+  if (events.includes('DISCARDED')) return null
   if (events.includes('INTERRUPTED')) return ATTENTION_REASONS.INTERRUPTED
   if (events.includes('STALLED')) return ATTENTION_REASONS.STALLED
   return '실패'

@@ -18,8 +18,8 @@ export function installFakes({ mode = 'on' } = {}) {
   if (mode) process.env.AGENT_MODE = mode
   else delete process.env.AGENT_MODE
 
-  const tables = { agent_tasks: [], schedule: [], agent_settings: [] }
-  const fake = { tables, tasks: tables.agent_tasks, schedule: tables.schedule, users: [{ id: OWNER_UID }], sent: [], edits: [], answers: [], dbCalls: 0, failDb: false, failTelegram: false, failScheduleInsert: false, failSettingsWrite: false }
+  const tables = { agent_tasks: [], schedule: [], agent_settings: [], work: [], work_meetings: [], plaud_inbox: [] }
+  const fake = { tables, tasks: tables.agent_tasks, schedule: tables.schedule, users: [{ id: OWNER_UID }], sent: [], edits: [], answers: [], dbCalls: 0, failDb: false, failTelegram: false, failScheduleInsert: false, failSettingsWrite: false, failWorkInsert: false }
   let nextMessageId = 500
   const json = (body, status = 200) => new Response(JSON.stringify(body), { status })
 
@@ -73,6 +73,19 @@ export function installFakes({ mode = 'on' } = {}) {
         if (existing) Object.assign(existing, body)
         else table.push({ ...body })
         return json([structuredClone(table.find((row) => row.id === body.id))], 201)
+      }
+      // 업무 부서·Plaud 받은함: 여러 줄(배열) 넣기와 고유 키를 흉내 낸다
+      if (table === tables.work || table === tables.work_meetings || table === tables.plaud_inbox) {
+        if (table === tables.work && fake.failWorkInsert) return json({ message: 'insert failed' }, 500)
+        const list = Array.isArray(body) ? body : [body]
+        const clash = (item) =>
+          (table === tables.plaud_inbox && table.some((row) => row.source_key === item.source_key)) ||
+          (table === tables.work_meetings && table.some((row) => row.user_id === item.user_id && row.plaud_key === item.plaud_key))
+        if (table === tables.plaud_inbox && list.some(clash)) return json([]) // ignore-duplicates
+        if (list.some(clash)) return json({ code: '23505', message: 'duplicate key' }, 409)
+        const rows = list.map((item) => ({ id: randomUUID(), created_at: new Date().toISOString(), received_at: new Date().toISOString(), ...item }))
+        table.push(...rows)
+        return json(structuredClone(rows), 201)
       }
       if (table === tables.schedule) {
         if (fake.failScheduleInsert) return json({ message: 'insert failed' }, 500)

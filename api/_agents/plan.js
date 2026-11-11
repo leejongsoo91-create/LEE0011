@@ -64,8 +64,10 @@ export function describePlan(plan) {
   return steps
     .map((s, index) => {
       const tool = getTool(s.tool)
-      const detail = tool?.describe && !tool.check?.(s.args) ? `: ${tool.describe(s.args)}` : ''
-      return `${index + 1}. ${tool?.label ?? s.tool}${detail} [${RISK_LABEL[s.risk] ?? s.risk}]`
+      // 여러 줄 설명(예: 회의 기록의 할 일 목록)이면 위험도 표시는 첫 줄 끝에 붙인다
+      const [first, ...more] = tool?.describe && !tool.check?.(s.args) ? tool.describe(s.args).split('\n') : []
+      const head = `${index + 1}. ${tool?.label ?? s.tool}${first ? `: ${first}` : ''} [${RISK_LABEL[s.risk] ?? s.risk}]`
+      return [head, ...more].join('\n')
     })
     .join('\n')
 }

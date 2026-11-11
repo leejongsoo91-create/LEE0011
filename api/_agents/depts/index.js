@@ -5,5 +5,6 @@ import agents from './agents/index.js'
 import invest from './invest/index.js'
 import schedule from './schedule/index.js'
 import test from './test/index.js'
+import work from './work/index.js'
 
-export const DEPARTMENTS = [schedule, invest, agents, test]
+export const DEPARTMENTS = [schedule, invest, agents, work, test]

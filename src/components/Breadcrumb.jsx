@@ -10,7 +10,11 @@ const linkClass = 'shrink-0 text-gray-400 transition-colors hover:text-white'
 export default function Breadcrumb() {
   const { pathname } = useLocation()
   const [title, setTitle] = useState(() => loadTitle(pathname))
-  const currentItem = navItems.find((item) => item.to === pathname) ?? navItems[0]
+  // 상세 화면(/work/<id>)은 위 메뉴(업무) 아래에 둔다
+  const currentItem =
+    navItems.find((item) => item.to === pathname) ??
+    navItems.find((item) => item.to !== '/' && pathname.startsWith(`${item.to}/`)) ??
+    navItems[0]
   const isSettings = pathname === '/settings'
   const isHome = currentItem.to === '/' && !isSettings
   const isManage = currentItem.group === 'manage' && !isSettings

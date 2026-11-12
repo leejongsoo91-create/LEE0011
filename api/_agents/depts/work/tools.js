@@ -107,9 +107,16 @@ export const workImportMeeting = {
     }
   },
   // 원복: 이 회의에 붙은 카드와 회의 기록만, 주인 user_id 조건을 붙여 삭제한다.
+  // 대시보드에서 고친 회의(edited_at 있음)는 지우지 않고 원복 실패로 알린다. (고친 내용을 잃지 않게)
   async undo(args, output) {
     if (!output?.meetingId) throw new Error('지울 회의 기록 id가 없습니다')
     const userId = await ownerUserId()
+    // edited_at 칸이 아직 없으면(SQL 20261114000000 실행 전, Supabase가 400으로 거절) 고친 적이 없는 것이므로 원래대로 지운다
+    const found = await rest(`work_meetings?id=eq.${output.meetingId}&user_id=eq.${userId}&select=id,edited_at`).catch((error) => {
+      if (error?.message === 'supabase-400') return []
+      throw error
+    })
+    if (found?.[0]?.edited_at) throw new Error('대시보드에서 수정된 회의라 원복하지 않았어요. 지우려면 업무 탭에서 직접 지워 주세요')
     const { cards, meetings } = await removeMeeting(userId, output.meetingId)
     return { summary: meetings ? `회의 기록 삭제 + 카드 ${cards}장 삭제: "${args.title}"` : '이미 지워진 회의 기록' }
   },

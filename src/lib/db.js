@@ -38,6 +38,14 @@ async function fetchRows(table) {
   return data ?? []
 }
 
+// 내 행 하나 조회. 없으면 null.
+export async function getRow(table, id) {
+  const userId = await getUserId()
+  const { data, error } = await getClient().from(table).select('*').eq('id', id).eq('user_id', userId).maybeSingle()
+  if (error) throw error
+  return data
+}
+
 // 새 행 추가. 내 user_id가 함께 저장된다.
 export async function insertRow(table, values) {
   const userId = await getUserId()
@@ -57,6 +65,13 @@ export async function updateRow(table, id, values) {
 export async function deleteRow(table, id) {
   const userId = await getUserId()
   const { error } = await getClient().from(table).delete().eq('id', id).eq('user_id', userId)
+  if (error) throw error
+}
+
+// 내 행 중 column = value인 것을 한 번에 삭제 (예: 회의에 붙은 할 일 전부)
+export async function deleteRowsWhere(table, column, value) {
+  const userId = await getUserId()
+  const { error } = await getClient().from(table).delete().eq(column, value).eq('user_id', userId)
   if (error) throw error
 }
 

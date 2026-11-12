@@ -6,10 +6,11 @@ const sizeClasses = {
 
 // 노션 페이지처럼 배경이 투명하고 글씨가 큰 제목 입력칸.
 // defaultValue로 처음 값을, onValueChange로 입력값을 주고받는다.
-export default function TitleInput({ size = 'page', defaultValue = '', onValueChange }) {
+export default function TitleInput({ size = 'page', defaultValue = '', onValueChange, maxLength }) {
   return (
     <input
       type="text"
+      maxLength={maxLength}
       aria-label="제목"
       placeholder="제목 없음"
       defaultValue={defaultValue}

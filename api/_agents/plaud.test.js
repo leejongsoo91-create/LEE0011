@@ -245,6 +245,26 @@ test('원복 도구: 이 회의에 붙은 내 카드와 회의 기록만 지운�
   assert.match((await workImportMeeting.undo({ title: 'x' }, { meetingId: meeting.id })).summary, /이미 지워진/)
 })
 
+test('원복 도구: 대시보드에서 고친 회의는 지우지 않고 실패로 알린다', async () => {
+  const task = await receiveOne()
+  await press('a', task)
+  const meeting = fake.tables.work_meetings[0]
+  meeting.edited_at = new Date().toISOString()
+  await assert.rejects(workImportMeeting.undo({ title: meeting.title }, { meetingId: meeting.id }), /대시보드에서 수정된 회의라 원복하지 않았어요/)
+  assert.equal(fake.tables.work_meetings.length, 1)
+  assert.equal(fake.tables.work.length, 3)
+})
+
+test('원복 도구: edited_at 칸이 아직 없으면(SQL 실행 전) 고친 적 없는 회의로 보고 지운다', async () => {
+  const task = await receiveOne()
+  await press('a', task)
+  const meeting = fake.tables.work_meetings[0]
+  fake.noEditedAtColumn = true
+  assert.match((await workImportMeeting.undo({ title: meeting.title }, { meetingId: meeting.id })).summary, /회의 기록 삭제/)
+  assert.equal(fake.tables.work_meetings.length, 0)
+  assert.equal(fake.tables.work.length, 0)
+})
+
 test('인자 검사: 형식이 틀리면 결재 전에 거부', () => {
   const good = {
     plaud_key: plaudKey('t', 'x'),

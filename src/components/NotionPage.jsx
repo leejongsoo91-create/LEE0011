@@ -75,7 +75,7 @@ function PageBody({ path, name, columns, table }) {
 const statusText = { saving: '저장 중...', saved: '저장됨', error: '저장 실패' }
 
 // 우측 상단에 작게 보이는 자동 저장 상태 (위쪽 여백에 놓여 다른 내용을 밀지 않는다)
-function SaveStatus({ state }) {
+export function SaveStatus({ state }) {
   return (
     <p
       role="status"

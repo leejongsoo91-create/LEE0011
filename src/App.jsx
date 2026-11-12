@@ -10,6 +10,7 @@ const Home = lazy(() => import('./pages/Home.jsx'))
 const Control = lazy(() => import('./pages/Control.jsx'))
 const Schedule = lazy(() => import('./pages/Schedule.jsx'))
 const Work = lazy(() => import('./pages/Work.jsx'))
+const WorkDetail = lazy(() => import('./pages/WorkDetail.jsx'))
 const Hobbies = lazy(() => import('./pages/Hobbies.jsx'))
 const Investments = lazy(() => import('./pages/Investments.jsx'))
 const Settings = lazy(() => import('./pages/Settings.jsx'))
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="control" element={<Control />} />
           <Route path="schedule" element={<Schedule />} />
           <Route path="work" element={<Work />} />
+          <Route path="work/:id" element={<WorkDetail />} />
           <Route path="hobbies" element={<Hobbies />} />
           <Route path="investments" element={<Investments />} />
           <Route path="settings" element={<Settings />} />

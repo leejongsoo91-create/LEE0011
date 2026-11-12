@@ -91,7 +91,7 @@ function describeDropped(dropped) {
 export default function useItemSave({ editing, onSaved }) {
   const { pathname } = useLocation()
   const [isSaving, setIsSaving] = useState(false)
-  const table = editing ? editing.table : tableByPath[pathname]
+  const table = editing ? editing.table : (tableByPath[pathname] ?? (pathname.startsWith('/work/') ? 'work' : undefined))
 
   const save = async (input) => {
     if (isSaving) return

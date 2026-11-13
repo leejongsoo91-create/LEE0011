@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import NotionPage from '../components/NotionPage.jsx'
 import WorkLogList from '../components/WorkLogList.jsx'
-import TeamAgentPanel from '../components/TeamAgentPanel.jsx'
 import WorkSummaryBar from '../components/WorkSummaryBar.jsx'
 import { loadPage } from '../lib/db.js'
 import { loadTitle, saveTitle } from '../utils/pageTitle.js'
@@ -10,7 +9,7 @@ import { readStorage, writeStorage } from '../utils/storage.js'
 
 const MEMO_KEY = 'work-memo-open'
 
-// 업무 탭(관제탑): 요약 → 개발 팀 → 업무 기록(날짜별 제목, 누르면 상세) → 메모(노션 본문, 기본은 접힘)
+// 업무 탭: 요약 → 업무 기록(날짜별 제목, 누르면 상세) → 메모(노션 본문, 기본은 접힘)
 export default function Work() {
   // 메모는 열었는지만 기기에 기억한다. 접혀 있으면 에디터를 아예 불러오지 않는다.
   const [memoOpen, setMemoOpen] = useState(() => readStorage(MEMO_KEY) === '1')
@@ -36,7 +35,6 @@ export default function Work() {
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-8">
       <WorkSummaryBar />
-      <TeamAgentPanel />
       <WorkLogList />
       <section aria-label="메모" className="-mt-4 flex flex-col gap-2">
         <button

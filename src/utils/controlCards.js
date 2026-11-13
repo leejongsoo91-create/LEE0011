@@ -78,7 +78,7 @@ function devTeamCard(devLog, now) {
   return {
     title: '개발 팀',
     icon: UsersRound,
-    to: '/work',
+    to: '#dev-team', // 같은 화면 맨 아래 현황판으로
     isLoading: devLog.isLoading,
     main: { value: members.filter((member) => member.state === 'running').length, label: '작업 중' },
     sub: last ? `마지막 기록 ${agoLabel(last, now.getTime())}` : '기록 없음',

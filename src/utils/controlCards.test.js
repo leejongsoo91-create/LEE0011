@@ -57,7 +57,7 @@ test('개발 팀 카드: 기록이 있을 때만, 작업 중 수·마지막 기�
   ])
   const dev = buildControlCards({ ...sources(), devLog }, now).at(-1)
   assert.equal(dev.title, '개발 팀')
-  assert.equal(dev.to, '/work')
+  assert.equal(dev.to, '#dev-team')
   assert.equal(dev.main.value, 1)
   assert.equal(dev.sub, '마지막 기록 5분 전')
   assert.equal(dev.items, 'Lead Coder ● · QA ✘ · DevOps —')

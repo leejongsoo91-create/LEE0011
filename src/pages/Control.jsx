@@ -1,7 +1,9 @@
 import { RefreshCw } from 'lucide-react'
 import ControlCard from '../components/ControlCard.jsx'
 import { AttentionList, RecentTasks } from '../components/ControlLists.jsx'
+import TeamAgentPanel from '../components/TeamAgentPanel.jsx'
 import useControlSummary from '../hooks/useControlSummary.js'
+import useDevLog from '../hooks/useDevLog.js'
 import useRows from '../hooks/useRows.js'
 import { buildControlCards } from '../utils/controlCards.js'
 import { formatAt } from '../utils/controlTime.js'
@@ -9,6 +11,7 @@ import { formatAt } from '../utils/controlTime.js'
 // 중앙관제: 영역별로 진행 중·대기·확인 필요를 한 화면에서 본다. (보기 전용, 결재는 텔레그램에서)
 //   에이전트 카드·확인 필요·최근 작업 → /api/control-summary (서버가 agent_tasks를 요약)
 //   업무·일정·주식·개발 팀 카드 → 브라우저가 Supabase에서 직접 (RLS로 내 것만)
+//   맨 아래 개발 팀 현황판(#dev-team): 개발 팀 카드를 누르면 여기로 내려온다
 
 const newest = (rows) => rows.reduce((max, row) => (row.created_at > max ? row.created_at : max), '')
 
@@ -17,7 +20,7 @@ export default function Control() {
   const work = useRows('work')
   const schedule = useRows('schedule')
   const investments = useRows('investments')
-  const devLog = useRows('dev_log')
+  const devLog = useDevLog() // 개발 팀 카드와 맨 아래 현황판이 같은 기록을 쓴다 (30초마다 새로 읽음)
   const agent = summary.data
 
   const cards = buildControlCards({ summary, work, schedule, investments, devLog })
@@ -60,6 +63,7 @@ export default function Control() {
 
       <AttentionList summary={agent} />
       <RecentTasks summary={agent} />
+      <TeamAgentPanel log={devLog} />
     </div>
   )
 }

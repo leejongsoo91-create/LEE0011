@@ -1,21 +1,21 @@
-import useDevLog from '../hooks/useDevLog.js'
 import { KIND_LABEL, STATE_LABEL, STATE_STYLE, agoLabel, lastLogAt, teamStatus } from '../utils/teamStatus.js'
 import AgentLogTimeline from './AgentLogTimeline.jsx'
 import Skeleton from './Skeleton.jsx'
 
-// 업무 탭 "개발 팀" 현황판: Lead Coder · QA/Reviewer · DevOps/Monitor 카드 3장 + 작업 로그.
+// 중앙관제 "개발 팀" 현황판: Lead Coder · QA/Reviewer · DevOps/Monitor 카드 3장 + 작업 로그.
 // 실시간 연결이 아니라, Claude Code가 단계마다 남긴 기록(dev_log)으로 상태를 계산한다.
-export default function TeamAgentPanel() {
-  const { rows, isLoading, now } = useDevLog()
+// 기록은 관제 화면이 useDevLog()로 한 번 읽어 넘긴다 (요약 카드와 같은 값을 쓰도록).
+export default function TeamAgentPanel({ log }) {
+  const { rows, isLoading, now } = log
   const members = teamStatus(rows, now)
   const last = lastLogAt(rows)
 
   return (
-    <section aria-labelledby="team-heading" className="flex flex-col gap-3">
+    <section id="dev-team" aria-labelledby="team-heading" className="flex scroll-mt-20 flex-col gap-3">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="team-heading" className="text-lg font-bold text-gray-100">
+        <h3 id="team-heading" className="text-lg font-semibold text-white">
           개발 팀
-        </h2>
+        </h3>
         <p className="text-xs text-gray-400">{last ? `마지막 기록 ${agoLabel(last, now)}` : '기록 없음'}</p>
       </header>
       {isLoading ? (

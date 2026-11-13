@@ -90,6 +90,7 @@ test('입구 보안: 시크릿이 맞는 POST만 받고, 거부할 때는 DB에 
     [{ 'x-plaud-secret': [HOOK_SECRET, HOOK_SECRET] }, 'POST', 401],
     [{ 'x-cron-secret': HOOK_SECRET }, 'POST', 401],
     [{ 'x-plaud-secret': HOOK_SECRET }, 'GET', 405],
+    [{}, 'GET', 405], // pg_cron 깨우기 호출(plaud-hook-warm): 비밀 값 없는 GET → 405, DB 안 부름
   ]
   for (const [headers, method, status] of rejected) {
     const result = await hook(BODY, headers, method)

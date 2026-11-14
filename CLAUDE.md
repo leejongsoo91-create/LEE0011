@@ -29,6 +29,7 @@
 - `npm run build` — 빌드 (화면을 바꿨으면 실행)
 - `npm run test:agents` — 에이전트 자동 테스트 (가짜 Supabase·텔레그램·AI, 외부 호출 없음)
 - `npm run test:hooks` — `.claude/hooks` 테스트
+- `npm run test:scripts` — `scripts/` 테스트 (개발 팀 기록 스크립트)
 
 ## 배포와 비밀 값
 

@@ -184,7 +184,7 @@ npm run preview   # 빌드 결과 미리보기
 업무 탭 위쪽 "개발 팀"에 Lead Coder · QA/Reviewer · DevOps/Monitor의 상태와 작업 로그가 보입니다. 실시간 연결이 아니라, 노트북의 Claude Code가 단계마다 남긴 기록으로 상태를 계산합니다 (30분 넘게 기록이 없으면 "대기", 마지막이 실패면 "실패" 유지).
 
 1. SQL 11번 실행
-2. 무작위 문자열(32자 이상)을 Vercel 환경변수 `DEV_LOG_SECRET`과 노트북 Windows 사용자 환경변수 `DEV_LOG_SECRET`에 똑같이 넣기
+2. 무작위 문자열(32자 이상)을 Vercel 환경변수 `DEV_LOG_SECRET`과 노트북 Windows 사용자 환경변수 `DEV_LOG_SECRET`에 똑같이 넣기 (WSL에서 돌리는 Claude Code도 `reg.exe`로 이 Windows 값을 읽으니 WSL에 따로 넣지 않습니다)
 3. 기록 보내기: `node scripts/dev-log.mjs <lead|qa|devops> <plan|edit|test|review|commit|deploy|check> <running|pass|fail|info> "한 줄 요약" [커밋 해시 또는 https 주소]`
 
 QA 실패와 배포 실패는 텔레그램으로도 알립니다. 요약에 비밀 값처럼 보이는 글자가 있으면 저장하지 않습니다.

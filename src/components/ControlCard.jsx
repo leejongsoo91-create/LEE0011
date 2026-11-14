@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { scrollToSection } from '../utils/scrollToSection.js'
 
 export const ATTENTION_TEXT = 'text-amber-700 dark:text-amber-400'
 
@@ -8,16 +9,6 @@ export default function ControlCard({ title, icon: Icon, to, main, sub, items, a
   const hasAttention = attention > 0
   const isSection = to?.startsWith('#')
   const Box = !to ? 'div' : isSection ? 'a' : Link
-  const scrollToSection = (event) => {
-    // Ctrl·⌘·Shift 클릭이나 가운데 버튼은 브라우저 기본 동작(새 탭 등)에 맡긴다
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-    const target = document.getElementById(to.slice(1))
-    if (!target) return
-    event.preventDefault()
-    // 기기에서 '동작 줄이기'를 켜 두었으면 부드러운 스크롤 없이 바로 이동
-    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
-  }
   return (
     <Box
       {...(!to ? {} : isSection ? { href: to, onClick: scrollToSection } : { to })}

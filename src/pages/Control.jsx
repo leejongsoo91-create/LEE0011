@@ -48,7 +48,7 @@ export default function Control() {
       </header>
 
       <section aria-labelledby="control-overview" className="flex flex-col gap-3">
-        <h3 id="control-overview" className="text-lg font-semibold text-white">
+        <h3 id="control-overview" className="scroll-mt-20 text-lg font-semibold text-white">
           전체 현황 <span className="ml-1 text-sm font-normal text-gray-400">진행 중 · 대기 · 확인 필요</span>
         </h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

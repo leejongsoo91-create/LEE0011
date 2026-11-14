@@ -1,6 +1,20 @@
 import { KIND_LABEL, STATE_LABEL, STATE_STYLE, agoLabel, lastLogAt, teamStatus } from '../utils/teamStatus.js'
 import AgentLogTimeline from './AgentLogTimeline.jsx'
 import Skeleton from './Skeleton.jsx'
+import { scrollToSection } from '../utils/scrollToSection.js'
+
+// 같은 화면 맨 위 전체 현황(#control-overview)으로 돌아가는 링크. 현황판 머리와 작업 로그 끝에 둔다.
+function BackToOverview({ className = '' }) {
+  return (
+    <a
+      href="#control-overview"
+      onClick={scrollToSection}
+      className={`text-xs text-gray-400 underline underline-offset-2 hover:text-white ${className}`}
+    >
+      <span aria-hidden="true">↑ </span>전체 현황으로
+    </a>
+  )
+}
 
 // 중앙관제 "개발 팀" 현황판: Lead Coder · QA/Reviewer · DevOps/Monitor 카드 3장 + 작업 로그.
 // 실시간 연결이 아니라, Claude Code가 단계마다 남긴 기록(dev_log)으로 상태를 계산한다.
@@ -16,7 +30,11 @@ export default function TeamAgentPanel({ log }) {
         <h3 id="team-heading" className="text-lg font-semibold text-white">
           개발 팀
         </h3>
-        <p className="text-xs text-gray-400">{last ? `마지막 기록 ${agoLabel(last, now)}` : '기록 없음'}</p>
+        <div className="flex items-baseline gap-3">
+          <p className="text-xs text-gray-400">{last ? `마지막 기록 ${agoLabel(last, now)}` : '기록 없음'}</p>
+          {/* 보이는 크기는 그대로, 누르는 영역만 위아래로 넓힘 */}
+          <BackToOverview className="-my-2 py-2" />
+        </div>
       </header>
       {isLoading ? (
         <div role="status" aria-label="불러오는 중" className="grid grid-cols-1 gap-2 lg:grid-cols-3">
@@ -50,6 +68,8 @@ export default function TeamAgentPanel({ log }) {
             })}
           </ul>
           <AgentLogTimeline rows={rows} now={now} />
+          {/* 로그를 다 읽고 내려온 자리에서도 바로 올라가게. 폰에서 누르기 쉽게 높이를 넉넉히 */}
+          <BackToOverview className="flex min-h-11 items-center self-center px-4" />
         </>
       )}
     </section>

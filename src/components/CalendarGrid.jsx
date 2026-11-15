@@ -106,9 +106,10 @@ export default function CalendarGrid() {
                   }}
                   className="flex cursor-pointer items-center gap-0.5 rounded bg-indigo-500/20 px-1 text-[10px] text-indigo-300 lg:text-xs"
                 >
-                  <span className="min-w-0 flex-1 truncate">
+                  {/* 폰은 칸이 좁아 시각을 빼고 제목을 두 줄까지, 넓으면 시각 + 제목 한 줄 */}
+                  <span className="line-clamp-2 min-w-0 flex-1 break-all leading-tight lg:line-clamp-1">
                     {row.agent_task && <Bot className="mr-0.5 inline h-2.5 w-2.5 lg:h-3 lg:w-3" aria-label="에이전트 작업 있음" />}
-                    {row.time && <span className="mr-1 text-indigo-200/70">{row.time.slice(0, 5)}</span>}
+                    {row.time && <span className="mr-1 hidden text-indigo-200/70 lg:inline">{row.time.slice(0, 5)}</span>}
                     {row.title || '제목 없음'}
                   </span>
                   <button

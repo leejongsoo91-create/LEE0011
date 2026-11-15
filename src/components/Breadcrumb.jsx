@@ -6,7 +6,7 @@ import { loadTitle } from '../utils/pageTitle.js'
 
 const linkClass = 'shrink-0 text-gray-400 transition-colors hover:text-white'
 
-// '홈 > 업무 > 현재 제목' 형태의 빵부스러기 내비게이션. 관리 메뉴는 '관리 > 관제'
+// '홈 > 업무 > 현재 제목' 형태의 빵부스러기 내비게이션 (제목이 없으면 '홈 > 업무'). 관리 메뉴는 '관리 > 관제'
 export default function Breadcrumb() {
   const { pathname } = useLocation()
   const [title, setTitle] = useState(() => loadTitle(pathname))
@@ -48,11 +48,19 @@ export default function Breadcrumb() {
           <>
             <li className={linkClass}><Link to="/">홈</Link></li>
             <ChevronRight className="h-4 w-4 shrink-0 text-gray-600" aria-hidden="true" />
-            <li className={linkClass}><Link to={currentItem.to}>{currentItem.label}</Link></li>
-            <ChevronRight className="h-4 w-4 shrink-0 text-gray-600" aria-hidden="true" />
-            <li aria-current="page" className="truncate font-semibold text-white">
-              {title.trim() || '제목 없음'}
-            </li>
+            {/* 제목이 없으면 세 번째 칸을 빼고 '홈 > 일정'까지만 */}
+            {title.trim() ? (
+              <>
+                <li className={linkClass}><Link to={currentItem.to}>{currentItem.label}</Link></li>
+                <ChevronRight className="h-4 w-4 shrink-0 text-gray-600" aria-hidden="true" />
+                <li aria-current="page" className="truncate font-semibold text-white">{title.trim()}</li>
+              </>
+            ) : pathname === currentItem.to ? (
+              <li aria-current="page" className="font-semibold text-white">{currentItem.label}</li>
+            ) : (
+              // 상세 화면(/work/<id>)에서 제목을 불러오기 전이면 목록으로 가는 링크만
+              <li className={linkClass}><Link to={currentItem.to}>{currentItem.label}</Link></li>
+            )}
           </>
         )}
       </ol>

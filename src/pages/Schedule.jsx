@@ -1,12 +1,12 @@
-import NotionPage from '../components/NotionPage.jsx'
 import CalendarGrid from '../components/CalendarGrid.jsx'
+import CollapsibleMemo from '../components/CollapsibleMemo.jsx'
 
-// 상단은 노션 에디터, 하단은 월간 달력
+// 일정 탭: 월간 달력 → 메모(노션 본문, 기본은 접힘)
 export default function Schedule() {
   return (
     <>
-      <NotionPage name="일정" columns={['이름', '날짜', '태그']} />
       <CalendarGrid />
+      <CollapsibleMemo path="/schedule" name="일정" storageKey="schedule-memo-open" className="mx-auto max-w-4xl" />
     </>
   )
 }

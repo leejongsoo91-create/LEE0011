@@ -1,5 +1,6 @@
 import { ATTENTION_TEXT } from './ControlCard.jsx'
 import { formatAt } from '../utils/controlTime.js'
+import { taskLabel } from '../utils/taskLabel.js'
 
 // 중앙관제의 두 목록: 확인 필요, 최근 에이전트 작업. (서버 요약 /api/control-summary 의 attention·recent)
 
@@ -67,9 +68,10 @@ export function RecentTasks({ summary }) {
           <span className={`w-16 shrink-0 font-medium ${task.flagged ? ATTENTION_TEXT : 'text-gray-300'}`}>
             {STATUS_LABELS[task.status] ?? task.status}
           </span>
-          <span className="min-w-0 flex-1 truncate text-gray-200">
+          {/* 폰은 상태·부서·시각을 윗줄에, 작업 문장은 아랫줄 전체에 두 줄까지 */}
+          <span className="order-last line-clamp-2 min-w-0 basis-full break-words text-gray-200 lg:order-none lg:flex-1 lg:basis-0">
             {task.auto && <span className="mr-1 text-gray-400">[자동]</span>}
-            {task.query}
+            {taskLabel(task.query)}
           </span>
           <span className="text-gray-400">{task.depts.map((dept) => DEPT_LABELS[dept] ?? dept).join(' · ')}</span>
           <span className="text-gray-400 tabular-nums">{formatAt(task.at)}</span>

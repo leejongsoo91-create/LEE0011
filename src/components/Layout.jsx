@@ -66,7 +66,7 @@ export default function Layout() {
       <CommandPalette />
       <div className="min-h-screen">
         <Header />
-        <main className="@container p-4 pb-28 lg:p-8 lg:pb-24">
+        <main className="@container p-4 pb-[calc(7rem+env(safe-area-inset-bottom))] lg:p-8 lg:pb-24">
           <Suspense fallback={<PageFallback />}>
             <Outlet />
           </Suspense>

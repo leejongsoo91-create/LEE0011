@@ -27,7 +27,7 @@ export default function ControlCard({ title, icon: Icon, to, main, sub, items, a
             <span className="text-sm text-gray-400">{main.label}</span>
           </p>
           <p className="text-sm text-gray-400 tabular-nums">{sub}</p>
-          <p className="min-h-5 truncate text-sm text-gray-400">{items || ' '}</p>
+          <p className="line-clamp-2 min-h-5 break-words text-sm text-gray-400">{items || ' '}</p>
         </>
       )}
       <p className={`mt-auto flex items-center gap-2 border-t border-gray-700 pt-3 text-sm ${hasAttention ? `font-semibold ${ATTENTION_TEXT}` : 'text-gray-400'}`}>

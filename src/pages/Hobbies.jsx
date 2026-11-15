@@ -1,12 +1,12 @@
-import NotionPage from '../components/NotionPage.jsx'
+import CollapsibleMemo from '../components/CollapsibleMemo.jsx'
 import HobbyList from '../components/HobbyList.jsx'
 
-// 상단은 노션 에디터, 하단은 취미 목록
+// 취미 탭: 취미 목록 → 메모(노션 본문, 기본은 접힘)
 export default function Hobbies() {
   return (
     <>
-      <NotionPage name="취미" columns={['이름', '태그', '날짜']} />
       <HobbyList />
+      <CollapsibleMemo path="/hobbies" name="취미" storageKey="hobbies-memo-open" className="mx-auto max-w-4xl" />
     </>
   )
 }

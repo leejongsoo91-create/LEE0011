@@ -33,8 +33,9 @@
 
 ## 배포와 비밀 값
 
-- 비밀 값(봇 토큰, 서비스 롤 키, ANTHROPIC_API_KEY, 시크릿)은 **Vercel 환경변수에만**. 채팅·코드·`VITE_` 접두사 금지. 목록은 `.env.example`.
-- 이 작업 환경에서는 실제 Supabase·텔레그램·Vercel·Anthropic에 접속할 수 없다. 검증은 자동 테스트와 임시 Postgres로 하고, 실제 확인은 사용자에게 단계별 가이드로 맡긴다.
+- 비밀 값(봇 토큰, 서비스 롤 키, ANTHROPIC_API_KEY, 시크릿)은 **Vercel 환경변수에만**. 채팅·코드·`VITE_` 접두사 금지. 목록은 `.env.example`. 예외는 `DEV_LOG_SECRET` 하나로, 개발 팀 기록용이라 노트북 Windows 사용자 환경변수에도 같은 값을 둔다.
+- 이 작업 환경(WSL)은 인터넷에 접속되지만 Supabase·텔레그램·Anthropic의 비밀 값이 없어 실제 데이터와 봇을 직접 다루지 않는다. 검증은 자동 테스트와 임시 Postgres로 하고, 실제 확인은 사용자에게 단계별 가이드로 맡긴다. Vercel 대시보드(배포 상태·로그·환경변수)도 사용자가 확인한다.
+- 할 수 있는 것: GitHub 푸시(Windows 자격 증명 관리자를 빌려 씀, 승인된 작업을 검토·커밋한 뒤), 배포 사이트 공개 페이지 응답 확인, `scripts/dev-log.mjs` 기록(Windows의 `DEV_LOG_SECRET`을 읽음).
 - 사용자는 폰과 노트북(Windows)으로 확인한다. 확인 가이드는 번호를 매겨 짧게.
 
 ## 작업 습관

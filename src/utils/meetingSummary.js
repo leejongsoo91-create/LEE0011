@@ -3,7 +3,13 @@
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 
-const plain = (text) => text.replace(/\*\*|__|`/g, '').trim()
+// 굵게(**, __)·코드(`)·기울임(*글자*) 표시를 지운다.
+// 계산식 별표("5 * 3", "2*3*4")는 남긴다: 여는 별표 바로 앞이 글자·숫자면 기울임으로 보지 않는다.
+const plain = (text) =>
+  text
+    .replace(/\*\*|__|`/g, '')
+    .replace(/(^|[^\w가-힣*])\*([^*\s](?:[^*]*[^*\s])?)\*/g, '$1$2')
+    .trim()
 
 export function summaryBlocks(markdown) {
   const blocks = []

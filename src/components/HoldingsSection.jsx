@@ -14,7 +14,7 @@ export default function HoldingsSection() {
   return (
     <section aria-label="보유 종목" className="mx-auto max-w-4xl pb-8">
       <h2 className="mb-4 text-xl font-bold text-gray-100">보유 종목</h2>
-      <DataState isLoading={isLoading} isEmpty={rows.length === 0} message="아직 등록된 항목이 없습니다" hint="오른쪽 아래 + 버튼을 눌러 Investments 페이지에서 첫 종목을 추가해 보세요.">
+      <DataState isLoading={isLoading} isEmpty={rows.length === 0} message="아직 등록된 항목이 없습니다" hint="오른쪽 아래 + 버튼으로 첫 종목을 추가해 보세요.">
         <InvestmentChart rows={rows} />
         <div className="mt-6 overflow-x-auto">
           <table className="w-full border-collapse text-sm">

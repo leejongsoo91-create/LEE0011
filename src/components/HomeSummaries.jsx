@@ -24,7 +24,7 @@ export function ScheduleSummary() {
   const upcoming = rows.filter((row) => row.date >= today).sort((a, b) => a.date.localeCompare(b.date))
   const items = upcoming.slice(0, 3).map((row) => ({ id: row.id, label: `${row.date.slice(5)} · ${row.title || '제목 없음'}` }))
   return (
-    <DataState isLoading={isLoading} isEmpty={items.length === 0} message="아직 등록된 항목이 없습니다" skeletonRows={2}>
+    <DataState isLoading={isLoading} isEmpty={items.length === 0} message="다가오는 일정이 없습니다" skeletonRows={2}>
       <TitleList items={items} />
     </DataState>
   )

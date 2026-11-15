@@ -101,7 +101,7 @@ function DeleteAccountCard({ email }) {
       </p>
       <label className="flex flex-col gap-1 text-xs text-gray-400">
         확인을 위해 내 이메일을 그대로 입력하세요
-        <input type="email" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={email} className={inputClass} />
+        <input type="email" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="이메일 주소" className={inputClass} />
       </label>
       <button
         type="button"

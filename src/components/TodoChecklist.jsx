@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import DataState from './DataState.jsx'
+import AutoTextarea, { fitTextarea } from './AutoTextarea.jsx'
 import DeleteButton from './DeleteButton.jsx'
 import useRows from '../hooks/useRows.js'
 import { deleteRow, insertRow, updateRow } from '../lib/db.js'
@@ -44,6 +45,7 @@ export default function TodoChecklist({ meetingId, onEdited }) {
     const value = input.value.trim()
     if (field === 'title' && !value) {
       input.value = todo.title
+      fitTextarea(input)
       return
     }
     const next = field === 'title' ? value : value || null
@@ -94,13 +96,14 @@ export default function TodoChecklist({ meetingId, onEdited }) {
                   aria-label={`${todo.title} 완료`}
                   className="mt-1 h-4 w-4 shrink-0 accent-indigo-500"
                 />
-                <input
-                  type="text"
+                {/* 긴 할 일도 줄을 바꿔 끝까지 보이게 */}
+                <AutoTextarea
                   defaultValue={todo.title}
                   maxLength={200}
                   aria-label="할 일 제목"
+                  enterKeyHint="done"
                   onBlur={(event) => saveText(todo, 'title', event.target)}
-                  className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${todo.status === 'Done' ? 'text-gray-400 line-through' : 'text-gray-100'}`}
+                  className={`min-w-0 flex-1 bg-transparent text-sm leading-6 outline-none ${todo.status === 'Done' ? 'text-gray-400 line-through' : 'text-gray-100'}`}
                 />
               </div>
               <div className="flex flex-wrap items-center gap-2 pl-6">

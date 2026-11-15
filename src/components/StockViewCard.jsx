@@ -2,6 +2,7 @@ import { ExternalLink, ChartLine } from 'lucide-react'
 import { STOCKVIEW_URL } from '../utils/stockview.js'
 
 // 주식 탭의 StockView 입구. StockView는 PC에서 켜 둔 때만 열리므로 새 탭으로 연다.
+// 폰·태블릿 세로(lg 미만)에서는 열리지 않으니 버튼 대신 안내만 보여 준다.
 export default function StockViewCard() {
   return (
     <section aria-labelledby="stockview-title" className="mx-auto max-w-4xl rounded-xl border border-gray-700 bg-gray-800 p-6">
@@ -14,12 +15,13 @@ export default function StockViewCard() {
         href={STOCKVIEW_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-5 inline-flex items-center gap-2 rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-[white] transition-colors hover:bg-indigo-400 focus-visible:outline-2 focus-visible:outline-offset-2"
+        className="mt-5 hidden items-center gap-2 lg:inline-flex rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-[white] transition-colors hover:bg-indigo-400 focus-visible:outline-2 focus-visible:outline-offset-2"
       >
         StockView 열기
         <ExternalLink className="h-4 w-4" aria-hidden="true" />
         <span className="sr-only">(새 탭)</span>
       </a>
+      <p className="mt-5 rounded-lg border border-gray-700 px-4 py-2.5 text-sm text-gray-300 lg:hidden">PC에서 열어 주세요</p>
       <ul className="mt-5 list-disc space-y-1 pl-5 text-sm text-gray-400">
         <li>PC에서 StockView 서버를 켜 둔 때만 열려요</li>
         <li>폰에서는 열리지 않아요</li>

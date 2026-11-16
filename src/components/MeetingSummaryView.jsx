@@ -27,7 +27,8 @@ function SummaryBlock({ block }) {
   if (block.type === 'todo') {
     return (
       <p className={`flex gap-2 break-words ${block.done ? 'text-gray-400 line-through' : ''}`}>
-        <span aria-hidden="true">{block.done ? '☑' : '☐'}</span>
+        {/* ☑는 컬러 이모지로 그려질 수 있어 \uFE0E로 흑백 글자 고정 */}
+        <span aria-hidden="true">{block.done ? '☑\uFE0E' : '☐'}</span>
         <span className="min-w-0">{block.text}</span>
       </p>
     )

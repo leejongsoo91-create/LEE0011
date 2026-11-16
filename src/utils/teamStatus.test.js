@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { agoLabel, filterLog, lastLogAt, refLink, teamStatus, workSummary } from './teamStatus.js'
+import { STATE_STYLE, agoLabel, filterLog, lastLogAt, refLink, teamStatus, workSummary } from './teamStatus.js'
 
 const NOW = Date.parse('2026-11-12T10:00:00Z')
 const at = (minutesAgo) => new Date(NOW - minutesAgo * 60000).toISOString()
@@ -70,4 +70,10 @@ test('업무 요약 띠', () => {
   ]
   const meetings = [{ created_at: at(60) }, { created_at: at(60 * 24 * 8) }]
   assert.deepEqual(workSummary(work, meetings, '2026-11-12', NOW), { todo: 2, doing: 1, dueToday: 2, recentMeetings: 1 })
+})
+
+test('상태 기호는 컬러 이모지로 바뀌지 않게 글자 표시를 붙인다', () => {
+  // 이모지로 그려질 수 있는 기호(✔ U+2714)는 뒤에 U+FE0E가 있어야 한다
+  assert.equal(STATE_STYLE.pass.icon, '✔︎')
+  for (const { icon } of Object.values(STATE_STYLE)) assert.ok(!icon.includes('️'), icon)
 })

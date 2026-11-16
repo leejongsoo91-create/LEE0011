@@ -14,7 +14,8 @@ export const STATE_LABEL = { running: '작업 중', pass: '통과', fail: '실�
 // 상태별 색과 기호 (기호를 함께 써서 색을 못 봐도 구분된다). 밝은 테마는 -700, 어두운 테마는 -400
 export const STATE_STYLE = {
   running: { text: 'text-sky-700 dark:text-sky-400', dot: 'bg-sky-500', icon: '●' },
-  pass: { text: 'text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500', icon: '✔' },
+  // ✔는 기기에 따라 컬러 이모지로 그려져서, 뒤에 \uFE0E(글자로 표시)를 붙여 흑백 글자로 고정한다
+  pass: { text: 'text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500', icon: '✔\uFE0E' },
   fail: { text: 'text-red-700 dark:text-red-400', dot: 'bg-red-500', icon: '✘' },
   // 기록은 연필: 가운뎃점(·)이면 관제 카드의 구분점과 겹쳐 보인다
   info: { text: 'text-gray-300', dot: 'bg-gray-400', icon: '✎' },

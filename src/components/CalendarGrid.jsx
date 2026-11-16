@@ -70,7 +70,9 @@ export default function CalendarGrid() {
         {isLoading && <Skeleton className="h-4 w-24" />}
       </div>
       <p className="-mt-2 mb-4 text-xs text-gray-400">날짜 칸을 두 번 누르면 일정 추가, 일정을 두 번 누르면 상세 보기·삭제</p>
-      <div className="grid grid-cols-7 gap-1 lg:gap-2">
+      {/* 폰은 칩 글자 칸(390px 폭에서 약 39px)을 넓히려고 칸 간격·안쪽 여백을 줄인다.
+          여백이 2px라 날짜 숫자가 둥근 모서리에 닿지 않게 모서리도 작게(rounded-md). 넓은 화면은 그대로 */}
+      <div className="grid grid-cols-7 gap-0.5 lg:gap-2">
         {weekdays.map((day, index) => (
           <div key={day} className={`py-2 text-center text-xs font-medium ${dayColor(index, false) || 'text-gray-400'}`}>
             {day}
@@ -84,7 +86,7 @@ export default function CalendarGrid() {
             <div
               key={date}
               onClick={(event) => isDoubleTap(`day-${date}`, event.timeStamp) && openAddModal({ date: dateString(date) })}
-              className={`touch-manipulation select-none flex min-h-16 min-w-0 flex-col gap-1 rounded-lg border bg-gray-800 p-1.5 text-xs text-gray-300 lg:min-h-24 lg:p-2 lg:text-sm ${
+              className={`touch-manipulation select-none flex min-h-16 min-w-0 flex-col gap-1 rounded-md border bg-gray-800 p-0.5 text-xs text-gray-300 lg:min-h-24 lg:rounded-lg lg:p-2 lg:text-sm ${
                 isThisMonth && date === today.getDate() ? 'border-gray-400 text-white' : 'border-gray-700'
               }`}
             >
@@ -104,7 +106,7 @@ export default function CalendarGrid() {
                     event.stopPropagation()
                     if (isDoubleTap(`event-${row.id}`, event.timeStamp)) openScheduleView(row)
                   }}
-                  className="flex cursor-pointer items-center gap-0.5 rounded bg-indigo-500/15 px-1 text-[10px] text-indigo-800 lg:text-xs dark:bg-indigo-500/20 dark:text-indigo-300"
+                  className="flex cursor-pointer items-center gap-0.5 rounded bg-indigo-500/15 px-0.5 text-[10px] text-indigo-800 lg:px-1 lg:text-xs dark:bg-indigo-500/20 dark:text-indigo-300"
                 >
                   {/* 폰은 칸이 좁아 시각을 빼고 제목을 두 줄까지, 넓으면 시각 + 제목 한 줄. 폰은 줄을 낱말 단위로 바꾸고 칸보다 긴 낱말만 끊는다.
                       넓은 화면은 한 줄이라 낱말 단위면 띄어쓰기 없는 제목이 통째로 숨을 수 있어 예전처럼 글자 단위로 끊는다 */}

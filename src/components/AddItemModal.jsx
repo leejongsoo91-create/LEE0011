@@ -97,7 +97,8 @@ export default function AddItemModal({ onClose, editing, prefill }) {
           <button
             type="button"
             onClick={() => save({ title, schedule, investment, content: contentRef.current })}
-            disabled={isSaving}
+            // 일정 시간 칸의 글을 시각으로 못 읽었으면 저장을 막는다 (모르는 사이 시간이 빠진 채 저장되지 않게)
+            disabled={isSaving || (table === 'schedule' && schedule.timeInvalid)}
             className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSaving ? '저장 중...' : '저장'}

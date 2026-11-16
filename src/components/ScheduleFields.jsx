@@ -1,5 +1,8 @@
+import { useId } from 'react'
 import { Bot } from 'lucide-react'
 import { AGENT_TASK_MAX } from '../utils/scheduleForm.js'
+import { parseTimeText, isAmbiguousMidnight } from '../utils/timeInput.js'
+import { formatKoreanTime } from '../utils/dateFormat.js'
 
 const inputClass =
   'rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-gray-200 outline-none focus:border-gray-500 disabled:cursor-not-allowed disabled:opacity-50'
@@ -22,8 +25,26 @@ const agentBeforeOptions = [
 ]
 
 // 일정 입력칸: 날짜, 시간(선택), 알림 시점, 에이전트 작업. 시간을 정해야 알림 시점과 에이전트 작업을 쓸 수 있다.
+// 시간은 시계 선택기 대신 글자로 친다 (14:30, 1430, 오후 2시 등). 읽은 시각은 칸 아래에 바로 보여 준다.
 export default function ScheduleFields({ values, onChange }) {
   const update = (key, value) => onChange({ ...values, [key]: value })
+  const hintId = useId()
+  // 친 글을 바로 읽어 저장할 시각(time)과 못 읽음 표시(timeInvalid)를 함께 바꾼다
+  const updateTime = (text) => {
+    const parsed = parseTimeText(text)
+    onChange({ ...values, timeText: text, time: parsed ?? '', timeInvalid: parsed === null })
+  }
+  // 칸에서 나가면 읽은 시각을 "14:30" 모양으로 정리한다 (못 읽은 글은 고칠 수 있게 그대로 둔다)
+  const tidyTime = () => {
+    if (!values.timeInvalid && values.time !== values.timeText) onChange({ ...values, timeText: values.time })
+  }
+  const timeHint = values.timeInvalid
+    ? isAmbiguousMidnight(values.timeText)
+      ? '날짜가 헷갈려요: 23:59로 적거나 다음 날 0:00으로 넣어 주세요'
+      : '시간을 읽지 못했어요 (예: 14:30, 오후 2시)'
+    : values.time && values.timeText !== values.time
+      ? `→ ${formatKoreanTime(values.time)}`
+      : ''
 
   return (
     <div className="flex flex-col gap-3">
@@ -32,10 +53,28 @@ export default function ScheduleFields({ values, onChange }) {
           날짜
           <input type="date" value={values.date} onChange={(event) => update('date', event.target.value)} className={inputClass} />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-gray-400">
-          시간 (선택)
-          <input type="time" value={values.time} onChange={(event) => update('time', event.target.value)} className={inputClass} />
-        </label>
+        {/* 안내 문구는 label 밖에 둔다 (입력칸 이름에 섞이지 않고 aria-describedby로만 읽히게) */}
+        <div className="flex flex-col gap-1">
+          <label className="flex flex-col gap-1 text-xs text-gray-400">
+            시간 (선택)
+            <input
+              type="text"
+              value={values.timeText}
+              onChange={(event) => updateTime(event.target.value)}
+              onBlur={tidyTime}
+              placeholder="예: 14:30, 오후 2시"
+              autoComplete="off"
+              enterKeyHint="done"
+              maxLength={20}
+              aria-invalid={values.timeInvalid || undefined}
+              aria-describedby={hintId}
+              className={`${inputClass} w-36 ${values.timeInvalid ? 'border-red-500 focus:border-red-500' : ''}`}
+            />
+          </label>
+          <span id={hintId} aria-live="polite" className={`min-h-4 text-xs ${values.timeInvalid ? 'text-red-400' : 'text-gray-400'}`}>
+            {timeHint}
+          </span>
+        </div>
         <label className="flex flex-col gap-1 text-xs text-gray-400">
           알림
           <select

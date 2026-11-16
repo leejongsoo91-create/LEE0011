@@ -61,7 +61,7 @@ export default function Control() {
         )}
       </section>
 
-      <AttentionList summary={agent} />
+      <AttentionList summary={agent} failed={Boolean(summary.error)} />
       <RecentTasks summary={agent} />
       <TeamAgentPanel log={devLog} />
     </div>

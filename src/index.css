@@ -13,3 +13,20 @@ html:not(.dark) {
   --color-gray-900: oklch(96.7% .003 264.542);
   --color-gray-950: oklch(98.5% .002 247.839);
 }
+
+/* 한글이 낱말 중간에서 줄바꿈되지 않게 한다 (보고서 9).
+   너무 긴 낱말(주소 등)만 칸을 넘을 때 끊는다. 칸마다 break-all 등을 준 곳은 유틸리티가 우선한다.
+   textarea는 브라우저 기본 스타일이 overflow-wrap을 다시 정하므로 따로 준다.
+   표와 숫자·시각 칸(tabular-nums)은 숫자가 글자 중간에서 끊기지 않게 예전처럼 둔다(표는 가로 스크롤). */
+@layer base {
+  body,
+  textarea,
+  input {
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+  table,
+  .tabular-nums {
+    overflow-wrap: normal;
+  }
+}

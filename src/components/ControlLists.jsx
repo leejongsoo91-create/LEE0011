@@ -32,8 +32,11 @@ function ListSection({ id, title, count, emptyText, children, isEmpty }) {
   )
 }
 
-export function AttentionList({ summary }) {
-  if (!summary) return <ListSection id="control-attention" title="확인 필요" count="—" isEmpty emptyText="불러오는 중이거나 불러오지 못했습니다" />
+// failed: 에이전트 요약을 불러오지 못했으면 true. 아직 데이터가 없을 때 불러오는 중과 실패를 나눠 보여 준다.
+export function AttentionList({ summary, failed = false }) {
+  if (!summary) {
+    return <ListSection id="control-attention" title="확인 필요" count="—" isEmpty emptyText={failed ? '불러오지 못했습니다' : '불러오는 중…'} />
+  }
   return (
     <ListSection
       id="control-attention"

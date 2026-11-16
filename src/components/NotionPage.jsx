@@ -11,13 +11,15 @@ import { saveTitle } from '../utils/pageTitle.js'
 // 제목, 에디터, 표 블록, 우측 목차로 이루어진 노션 스타일 페이지.
 // 제목과 본문은 입력을 멈추면 Supabase에 자동 저장되고, 다른 기기에서도 같은 내용으로 열린다.
 // table을 넘기면 빈 표 블록 대신 그것을 보여준다. false를 넘기면 표 자리를 비운다. (업무 탭의 메모)
-export default function NotionPage({ name, columns, table }) {
+// titlePlaceholder는 빈 제목 칸의 안내 문구 (메모는 "메모 제목 (선택)").
+// 본문 상자는 w-full: 세로 flex 안에 놓여도 내용 폭으로 줄지 않고 최대 4xl까지 차게 한다 (목차가 본문 바깥 오른쪽에 붙도록).
+export default function NotionPage({ name, columns, table, titlePlaceholder }) {
   const { pathname } = useLocation()
   // 페이지가 바뀌면 불러오기·저장 상태를 새로 시작한다.
-  return <PageBody key={pathname} path={pathname} name={name} columns={columns} table={table} />
+  return <PageBody key={pathname} path={pathname} name={name} columns={columns} table={table} titlePlaceholder={titlePlaceholder} />
 }
 
-function PageBody({ path, name, columns, table }) {
+function PageBody({ path, name, columns, table, titlePlaceholder }) {
   const [headings, setHeadings] = useState([])
   const { status, doc, saveState, change, reload } = usePageDoc(path)
 
@@ -33,7 +35,7 @@ function PageBody({ path, name, columns, table }) {
 
   if (status !== 'ready') {
     return (
-      <article className="relative mx-auto flex max-w-4xl flex-col gap-8 py-4 lg:py-8">
+      <article className="relative mx-auto flex w-full max-w-4xl flex-col gap-8 py-4 lg:py-8">
         {status === 'loading' ? (
           <div role="status" aria-label="불러오는 중" className="flex flex-col gap-4">
             <Skeleton className="h-12 w-2/3" />
@@ -54,10 +56,10 @@ function PageBody({ path, name, columns, table }) {
   }
 
   return (
-    <article className="relative mx-auto flex max-w-4xl flex-col gap-8 py-4 lg:py-8">
+    <article className="relative mx-auto flex w-full max-w-4xl flex-col gap-8 py-4 lg:py-8">
       <SaveStatus state={saveState} />
       <header>
-        <TitleInput size="page" defaultValue={doc?.title ?? ''} onValueChange={handleTitle} />
+        <TitleInput size="page" defaultValue={doc?.title ?? ''} onValueChange={handleTitle} placeholder={titlePlaceholder} />
       </header>
       <section aria-label="본문">
         <NotionEditor

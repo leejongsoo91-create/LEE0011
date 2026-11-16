@@ -104,12 +104,13 @@ export default function CalendarGrid() {
                     event.stopPropagation()
                     if (isDoubleTap(`event-${row.id}`, event.timeStamp)) openScheduleView(row)
                   }}
-                  className="flex cursor-pointer items-center gap-0.5 rounded bg-indigo-500/20 px-1 text-[10px] text-indigo-300 lg:text-xs"
+                  className="flex cursor-pointer items-center gap-0.5 rounded bg-indigo-500/15 px-1 text-[10px] text-indigo-800 lg:text-xs dark:bg-indigo-500/20 dark:text-indigo-300"
                 >
-                  {/* 폰은 칸이 좁아 시각을 빼고 제목을 두 줄까지, 넓으면 시각 + 제목 한 줄 */}
-                  <span className="line-clamp-2 min-w-0 flex-1 break-all leading-tight lg:line-clamp-1">
+                  {/* 폰은 칸이 좁아 시각을 빼고 제목을 두 줄까지, 넓으면 시각 + 제목 한 줄. 폰은 줄을 낱말 단위로 바꾸고 칸보다 긴 낱말만 끊는다.
+                      넓은 화면은 한 줄이라 낱말 단위면 띄어쓰기 없는 제목이 통째로 숨을 수 있어 예전처럼 글자 단위로 끊는다 */}
+                  <span className="line-clamp-2 min-w-0 flex-1 break-keep wrap-anywhere leading-tight lg:break-all lg:line-clamp-1">
                     {row.agent_task && <Bot className="mr-0.5 inline h-2.5 w-2.5 lg:h-3 lg:w-3" aria-label="에이전트 작업 있음" />}
-                    {row.time && <span className="mr-1 hidden text-indigo-200/70 lg:inline">{row.time.slice(0, 5)}</span>}
+                    {row.time && <span className="mr-1 hidden text-indigo-700 lg:inline dark:text-indigo-200/70">{row.time.slice(0, 5)}</span>}
                     {row.title || '제목 없음'}
                   </span>
                   <button
@@ -119,7 +120,7 @@ export default function CalendarGrid() {
                       event.stopPropagation()
                       handleDelete(row.id)
                     }}
-                    className="hidden shrink-0 rounded text-indigo-300/60 hover:text-red-400 lg:block"
+                    className="hidden shrink-0 rounded text-indigo-700 hover:text-red-600 lg:block dark:text-indigo-300/60 dark:hover:text-red-400"
                   >
                     <X className="h-3 w-3" aria-hidden="true" />
                   </button>

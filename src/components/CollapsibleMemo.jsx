@@ -41,7 +41,7 @@ export default function CollapsibleMemo({ path, name, storageKey, className = ''
         <ChevronDown className={`h-5 w-5 transition-transform ${open ? '' : '-rotate-90'}`} aria-hidden="true" />
         메모
       </button>
-      {open && <NotionPage name={name} table={false} />}
+      {open && <NotionPage name={name} table={false} titlePlaceholder="메모 제목 (선택)" />}
     </section>
   )
 }

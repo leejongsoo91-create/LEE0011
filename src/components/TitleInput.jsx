@@ -7,13 +7,13 @@ const sizeClasses = {
 }
 
 // 노션 페이지처럼 배경이 투명하고 글씨가 큰 제목 입력칸. 제목이 길면 줄을 바꿔 끝까지 보여 준다.
-// defaultValue로 처음 값을, onValueChange로 입력값을 주고받는다.
-export default function TitleInput({ size = 'page', defaultValue = '', onValueChange, maxLength }) {
+// defaultValue로 처음 값을, onValueChange로 입력값을 주고받는다. placeholder를 안 주면 "제목 없음".
+export default function TitleInput({ size = 'page', defaultValue = '', onValueChange, maxLength, placeholder = '제목 없음' }) {
   return (
     <AutoTextarea
       maxLength={maxLength}
       aria-label="제목"
-      placeholder="제목 없음"
+      placeholder={placeholder}
       defaultValue={defaultValue}
       enterKeyHint="done"
       onChange={(event) => onValueChange?.(event.target.value)}

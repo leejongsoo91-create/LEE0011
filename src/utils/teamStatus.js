@@ -16,7 +16,8 @@ export const STATE_STYLE = {
   running: { text: 'text-sky-700 dark:text-sky-400', dot: 'bg-sky-500', icon: '●' },
   pass: { text: 'text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500', icon: '✔' },
   fail: { text: 'text-red-700 dark:text-red-400', dot: 'bg-red-500', icon: '✘' },
-  info: { text: 'text-gray-300', dot: 'bg-gray-400', icon: '·' },
+  // 기록은 연필: 가운뎃점(·)이면 관제 카드의 구분점과 겹쳐 보인다
+  info: { text: 'text-gray-300', dot: 'bg-gray-400', icon: '✎' },
   idle: { text: 'text-gray-400', dot: 'bg-gray-600', icon: '○' },
   none: { text: 'text-gray-400', dot: 'bg-gray-700', icon: '—' },
 }

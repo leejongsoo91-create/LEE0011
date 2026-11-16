@@ -53,8 +53,9 @@ export default function ScheduleFields({ values, onChange }) {
           날짜
           <input type="date" value={values.date} onChange={(event) => update('date', event.target.value)} className={inputClass} />
         </label>
-        {/* 안내 문구는 label 밖에 둔다 (입력칸 이름에 섞이지 않고 aria-describedby로만 읽히게) */}
-        <div className="flex flex-col gap-1">
+        {/* 안내 문구는 label 밖에 둔다 (입력칸 이름에 섞이지 않고 aria-describedby로만 읽히게).
+            묶음 폭을 입력칸과 같게 고정해, 긴 안내가 떠도 칸이 아랫줄로 밀리지 않고 안내만 줄을 바꾼다 */}
+        <div className="flex w-36 flex-col gap-1">
           <label className="flex flex-col gap-1 text-xs text-gray-400">
             시간 (선택)
             <input
@@ -71,7 +72,7 @@ export default function ScheduleFields({ values, onChange }) {
               className={`${inputClass} w-36 ${values.timeInvalid ? 'border-red-500 focus:border-red-500' : ''}`}
             />
           </label>
-          <span id={hintId} aria-live="polite" className={`min-h-4 text-xs ${values.timeInvalid ? 'text-red-400' : 'text-gray-400'}`}>
+          <span id={hintId} aria-live="polite" className={`min-h-4 text-xs ${values.timeInvalid ? 'text-red-600 dark:text-red-400' : 'text-gray-400'}`}>
             {timeHint}
           </span>
         </div>

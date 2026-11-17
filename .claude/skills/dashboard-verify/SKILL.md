@@ -1,9 +1,11 @@
 ---
 name: dashboard-verify
-description: 화면을 바꾼 작업을 마친 뒤, 또는 사용자가 "확인해봐", "화면 봐줘"라고 할 때 무료 도구로 대시보드 화면을 직접 확인하는 순서. 로컬은 Playwright MCP, 로그인된 배포 사이트는 Aside repl. 결과 보고서의 테스트 칸에 쓴다.
+description: QA 세션(대시보드-QA)용. 메인이 [테스트 요청]으로 화면 점검을 맡겼을 때, 또는 사용자가 QA 창에서 "확인해봐", "화면 봐줘"라고 할 때 무료 도구로 대시보드 화면을 직접 확인하는 순서. 로컬은 Playwright MCP, 로그인된 배포 사이트는 Aside repl. 결과 보고서의 테스트 칸에 쓴다.
 ---
 
 # 대시보드 화면 확인 (무료 도구만)
+
+**이 순서는 QA 세션(`대시보드-QA`)이 쓴다.** 메인 세션은 직접 점검하지 않고 `SendMessage`로 `[테스트 요청]`을 보낸 뒤 `[QA 보고]`를 받는다 (CLAUDE.md 작업 습관).
 
 결과 보고서의 "테스트 결과"에는 이 순서로 직접 본 것만 적는다. 못 본 항목은 못 봤다고 적는다.
 
@@ -18,14 +20,13 @@ description: 화면을 바꾼 작업을 마친 뒤, 또는 사용자가 "확인�
 
 ## 1. 로컬 화면 (Playwright)
 
-1. 개발 서버: `npm run dev`를 백그라운드로 실행하고 `http://localhost:5173` 응답(200)을 기다린다. 이미 떠 있으면 그대로 쓴다.
+1. 개발 서버: `http://localhost:5173` 응답(200)만 확인한다. QA는 서버를 띄우거나 끄지 않는다. 응답이 없으면 로컬 화면은 "미확인(서버 꺼짐)"으로 적고 배포 사이트 확인으로 넘어간다.
 2. `browser_navigate` → `http://localhost:5173`
 3. 로그인 전 화면만 볼 수 있다. 비밀번호·토큰은 입력하지 않는다 (Playwright는 `--isolated`라 로그인이 남지 않는다).
 4. 크기 두 가지로 캡처한다 (`browser_resize` → `browser_take_screenshot`):
    - 노트북 1366×800
    - 폰 390×844 (화면을 바꾼 작업일 때만)
 5. `browser_console_messages`로 오류를 확인한다. 오류가 있으면 보고서에 그대로 적는다.
-6. 확인이 끝나면 개발 서버를 끈다 (직접 띄운 경우만).
 
 MCP 브라우저가 `spawn UNKNOWN`으로 안 뜨면: 이 PC는 Windows 스마트 앱 컨트롤이 켜져 있어 Playwright 전용 크로미움(`chrome.exe`)을 막는다 (2026-11-09 확인). 그래서 `~/.claude.json`의 playwright MCP를 `--browser msedge`로 바꿔 두었다. 그래도 안 뜨면 설정이 `chromium`으로 돌아가지 않았는지 보고, 급하면 CLI로 캡처만 한다 (CLI는 창 없는 headless라 막히지 않는다). 콘솔 오류 확인은 못 하니 보고서에 그렇게 적는다.
 ```bash

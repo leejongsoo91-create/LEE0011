@@ -7,7 +7,7 @@ description: 푸시한 뒤 Vercel 배포와 텔레그램 에이전트가 실제�
 
 번호를 매겨 짧게, 폰과 노트북 어느 쪽에서도 따라 할 수 있게 쓴다.
 
-먼저 `dashboard-verify`로 화면을 직접 확인한다. 아래 가이드에는 텔레그램·Supabase처럼 여기서 볼 수 없는 것만 남긴다.
+먼저 QA 세션에 배포 확인(`dashboard-verify` 순서)을 `[테스트 요청]`으로 맡기고 `[QA 보고]`를 받는다. 아래 가이드에는 텔레그램·Supabase처럼 여기서 볼 수 없는 것만 남긴다.
 
 1. **배포**: Vercel → Deployments에서 방금 커밋이 Ready인지. 환경변수를 바꿨다면 Redeploy.
 2. **응답 확인**: 텔레그램에 조회 지시(예: 「이번 주 일정 알려줘」). 답이 없으면 브라우저로 `https://api.telegram.org/bot<봇토큰>/getWebhookInfo` → `last_error_message` (401이면 시크릿 불일치).

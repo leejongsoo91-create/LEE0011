@@ -25,7 +25,7 @@ export default defineConfig({
     // 스마트폰 홈 화면에 앱처럼 설치할 수 있게 한다. 새 배포가 나오면 서비스 워커가 알아서 갱신된다.
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.png', 'apple-touch-icon.png'],
+      includeAssets: ['favicon.png', 'apple-touch-icon.png', 'theme-init.js'],
       manifest: {
         name: '내 대시보드',
         short_name: '대시보드',

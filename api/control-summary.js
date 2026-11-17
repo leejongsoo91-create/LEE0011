@@ -10,19 +10,7 @@
 
 import { loadControlSummary } from './_agents/control.js'
 import { ownerUserId } from './_agents/owner.js'
-
-// 로그인 토큰의 사용자 id. 확인할 수 없으면 null.
-export async function userIdFromToken(authorization) {
-  const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL
-  const anonKey = process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !anonKey || typeof authorization !== 'string' || !authorization.startsWith('Bearer ')) return null
-  const response = await fetch(`${url.replace(/\/$/, '')}/auth/v1/user`, {
-    headers: { apikey: anonKey, Authorization: authorization },
-  })
-  if (!response.ok) return null
-  const user = await response.json().catch(() => null)
-  return typeof user?.id === 'string' ? user.id : null
-}
+import { userIdFromToken } from './_lib/session.js'
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')

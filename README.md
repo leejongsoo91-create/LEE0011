@@ -54,7 +54,7 @@
 
 [Supabase](https://supabase.com/)로 로그인과 데이터베이스를 모두 처리합니다.
 
-- **이메일/비밀번호 로그인 및 회원가입** (`signInWithPassword`, `signUp`)
+- **이메일/비밀번호 로그인** (`signInWithPassword`). 혼자 쓰는 대시보드라 회원가입은 없고, Supabase에서도 가입을 꺼 둔다
 - **보호된 라우트**: 로그인하지 않으면 어떤 페이지로 들어가도 로그인 화면으로 이동
 - **Row Level Security(RLS)**: 모든 테이블에 `user_id`가 있고, 정책 `auth.uid() = user_id`로 **내 데이터만 읽고 쓸 수 있음**
 - **실시간 DB 동기화**: 항목 **추가 · 수정 · 삭제**가 즉시 Supabase에 반영

@@ -11,14 +11,6 @@ export async function signIn(email, password) {
   if (error) throw error
 }
 
-// 회원가입한다. 이메일 인증이 켜져 있으면 session이 없고, 켜져 있지 않으면 바로 로그인된다.
-export async function signUp(email, password) {
-  // 인증 메일의 링크가 지금 접속 중인 사이트 주소로 돌아오도록 알려 준다. (Supabase의 Redirect URLs에 허용된 주소여야 함)
-  const { data, error } = await getClient().auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } })
-  if (error) throw error
-  return { needsConfirmation: !data.session }
-}
-
 export async function signOut() {
   const { error } = await getClient().auth.signOut()
   if (error) throw error
@@ -44,7 +36,6 @@ export function describeAuthError(error) {
   const message = error?.message ?? ''
   if (message.includes('Invalid login credentials')) return '이메일 또는 비밀번호가 올바르지 않습니다'
   if (message.includes('Email not confirmed')) return '이메일 인증을 먼저 완료해 주세요'
-  if (message.includes('already registered')) return '이미 가입된 이메일입니다'
   if (message.includes('different from the old')) return '이전과 다른 비밀번호를 입력해 주세요'
   if (message.includes('weak') || message.includes('easy to guess')) return '더 안전한 비밀번호를 사용해 주세요'
   if (message.includes('at least')) return '비밀번호는 6자 이상이어야 합니다'

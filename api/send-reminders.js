@@ -29,7 +29,11 @@ export function buildReminder(row) {
   return ['⏰ [일정 알림]', ...lines, `알림: ${when}`].join('\n')
 }
 
-function safeEqual(a = '', b = '') {
+// 다른 입구(agent-cron·plaud-hook·dev-log)와 같은 기준: 시크릿이 짧으면 문을 열지 않는다 (보고서 10)
+export const MIN_SECRET_LENGTH = 32
+
+function safeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false
   const left = Buffer.from(a)
   const right = Buffer.from(b)
   return left.length === right.length && timingSafeEqual(left, right)
@@ -45,7 +49,10 @@ export default async function handler(req, res) {
   const secret = process.env.CRON_SECRET
   const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!secret || !url || !serviceKey) return res.status(503).json({ error: '서버 설정이 없습니다' })
+  if (!url || !serviceKey || typeof secret !== 'string' || secret.length < MIN_SECRET_LENGTH || secret !== secret.trim()) {
+    if (url && serviceKey) console.error('[send-reminders] CRON_SECRET이 없거나 32자보다 짧거나 앞뒤에 공백이 있어요')
+    return res.status(503).json({ error: '서버 설정이 없습니다' })
+  }
   if (!safeEqual(req.headers['x-cron-secret'], secret)) return res.status(401).json({ error: '권한이 없습니다' })
 
   try {

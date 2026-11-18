@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { DragDropContext } from '@hello-pangea/dnd'
 import WidgetColumn from './WidgetColumn.jsx'
+import { readStorage, writeStorage } from '../utils/storage.js'
+import { parseWidgetOrder } from '../utils/today.js'
 
 // 데스크톱은 2개 열, 모바일은 1개 열로 보여준다. (lg = 1024px)
 const query = '(min-width: 1024px)'
@@ -11,12 +13,20 @@ const interleave = ([left, right]) =>
     [left[i], right[i]].filter(Boolean),
   )
 
-// 위젯 제목을 잡고 끌어서 순서를 바꿀 수 있는 그리드 (새로고침하면 초기화됨)
+const DEFAULT_ORDER = [
+  ['Schedule', 'Hobbies'],
+  ['Work', 'Investments'],
+]
+// 상자 순서는 이 기기에만 저장한다 (폰과 노트북은 화면 모양이 달라서, 보고서 11)
+const ORDER_KEY = 'home-widget-order'
+
+// 위젯 제목을 잡고 끌어서 순서를 바꿀 수 있는 그리드. 바꾼 순서는 새로고침해도 남는다.
 export default function WidgetGrid() {
-  const [columns, setColumns] = useState([
-    ['Schedule', 'Hobbies'],
-    ['Work', 'Investments'],
-  ])
+  const [columns, setColumnsState] = useState(() => parseWidgetOrder(readStorage(ORDER_KEY), DEFAULT_ORDER))
+  const setColumns = (next) => {
+    setColumnsState(next)
+    writeStorage(ORDER_KEY, JSON.stringify(next))
+  }
   const [isWide, setIsWide] = useState(() => window.matchMedia(query).matches)
 
   useEffect(() => {

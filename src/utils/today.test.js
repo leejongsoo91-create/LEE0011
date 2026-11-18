@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { daysBetween, dueLabel, dueWork, openWork, parseWidgetOrder, todaySchedule, weekScheduleCount } from './today.js'
+import { daysBetween, dueLabel, dueWork, filterOpenWork, openWork, parseWidgetOrder, parseWorkFilter, recentMeetings, todaySchedule, weekScheduleCount } from './today.js'
 
 const TODAY = '2026-11-18'
 
@@ -73,4 +73,30 @@ test('상자 순서: 올바른 저장값만 쓰고 이상하면 기본값', () =
   for (const bad of [null, '', '{', '[]', JSON.stringify([['Work'], ['Hobbies']]), JSON.stringify([['Work', 'Work'], ['Hobbies', 'Investments']]), JSON.stringify([['Work', 'Old'], ['Schedule', 'Hobbies', 'Investments']]), JSON.stringify([[1, 2], [3, 4]])]) {
     assert.deepEqual(parseWidgetOrder(bad, defaults), defaults, `잘못된 값: ${bad}`)
   }
+})
+
+test('업무 걸러 보기: 주소 값 검사', () => {
+  for (const value of ['todo', 'doing', 'due', 'meetings']) assert.equal(parseWorkFilter(value), value)
+  for (const value of [null, '', 'Done', 'TODO', 'constructor']) assert.equal(parseWorkFilter(value), '')
+})
+
+test('남은 할 일 걸러 보기: 할 일·진행 중·마감(오늘+지난), 완료는 늘 빠짐', () => {
+  const ids = (show) => filterOpenWork(work, show, TODAY).map((r) => r.id)
+  assert.deepEqual(ids(''), ['late', 'today', 'later', 'nodue-new', 'nodue-old'])
+  assert.deepEqual(ids('todo'), ['today', 'later', 'nodue-new', 'nodue-old'])
+  assert.deepEqual(ids('doing'), ['late'])
+  assert.deepEqual(ids('due'), ['late', 'today'])
+  assert.deepEqual(ids('meetings'), ids(''), '회의 걸러 보기는 할 일 목록을 거르지 않는다')
+  assert.deepEqual(filterOpenWork(null, 'todo', TODAY), [])
+})
+
+test('최근 7일 회의: 들어온 시각 기준, 7일 경계 포함', () => {
+  const now = Date.parse('2026-11-18T12:00:00Z')
+  const rows = [
+    { id: 'new', created_at: '2026-11-17T00:00:00Z' },
+    { id: 'edge', created_at: '2026-11-11T12:00:00Z' },
+    { id: 'old', created_at: '2026-11-11T11:59:59Z' },
+    { id: 'bad', created_at: null },
+  ]
+  assert.deepEqual(recentMeetings(rows, now).map((r) => r.id), ['new', 'edge'])
 })

@@ -68,7 +68,7 @@ export default function TodayPanel() {
                 ))}
                 {due.length > DUE_LIMIT && (
                   <li>
-                    <Link to="/work" className="px-1 text-xs text-gray-400 underline hover:text-white">
+                    <Link to="/work?show=due" className="px-1 text-xs text-gray-400 underline hover:text-white">
                       외 {due.length - DUE_LIMIT}건 업무 탭에서 보기
                     </Link>
                   </li>

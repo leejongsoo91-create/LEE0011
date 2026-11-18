@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { STATE_STYLE, agoLabel, filterLog, lastLogAt, refLink, teamStatus, workSummary } from './teamStatus.js'
+import { STATE_STYLE, agoLabel, filterLog, lastLogAt, refLink, teamStatus } from './teamStatus.js'
 
 const NOW = Date.parse('2026-11-12T10:00:00Z')
 const at = (minutesAgo) => new Date(NOW - minutesAgo * 60000).toISOString()
@@ -59,17 +59,6 @@ test('ref 링크: 커밋 해시·https만', () => {
   assert.equal(refLink('https://claude.ai/artifact/x').label, '링크')
   assert.equal(refLink('javascript:alert(1)'), null)
   assert.equal(refLink(null), null)
-})
-
-test('업무 요약 띠', () => {
-  const work = [
-    { status: 'Todo', due_date: '2026-11-12' },
-    { status: 'Todo' },
-    { status: 'In Progress', due_date: '2026-11-12' },
-    { status: 'Done', due_date: '2026-11-12' },
-  ]
-  const meetings = [{ created_at: at(60) }, { created_at: at(60 * 24 * 8) }]
-  assert.deepEqual(workSummary(work, meetings, '2026-11-12', NOW), { todo: 2, doing: 1, dueToday: 2, recentMeetings: 1 })
 })
 
 test('상태 기호는 컬러 이모지로 바뀌지 않게 글자 표시를 붙인다', () => {

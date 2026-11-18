@@ -66,14 +66,3 @@ export function refLink(ref) {
   if (/^https:\/\/\S+$/.test(ref)) return { href: ref, label: '링크' }
   return null
 }
-
-// 업무 탭 요약 띠: 할 일 · 진행 중 · 오늘 마감(완료 제외) · 최근 7일 회의
-export function workSummary(work, meetings, today, now = Date.now()) {
-  const weekAgo = now - 7 * 24 * 60 * 60 * 1000
-  return {
-    todo: work.filter((row) => row.status === 'Todo').length,
-    doing: work.filter((row) => row.status === 'In Progress').length,
-    dueToday: work.filter((row) => row.due_date === today && row.status !== 'Done').length,
-    recentMeetings: meetings.filter((row) => Date.parse(row.created_at) >= weekAgo).length,
-  }
-}

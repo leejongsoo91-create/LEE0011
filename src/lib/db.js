@@ -16,6 +16,14 @@ async function getUserId() {
 // 같은 표를 여러 화면 조각이 동시에 부르면(예: 업무 탭의 요약 띠·회의 기록·칸반) 요청 하나를 같이 쓴다.
 const inflight = new Map()
 
+// 목록에 쓰는 칸만 불러오는 표 (보고서 11 2단계). 본문(content)·회의 요약(summary_md)처럼 큰 칸은 목록에서 빼고,
+// 상세 화면이 getRow로 한 행 전부를 따로 불러온다. 여기 없는 표는 전부(*) 불러온다.
+// 칸을 더하려면 이 목록과 그 표를 읽는 화면(useRows)을 같이 본다.
+const LIST_COLUMNS = {
+  work: 'id, title, status, progress, due_date, assignee, meeting_id, created_at',
+  work_meetings: 'id, title, recorded_at, created_at',
+}
+
 // 내 목록 조회 (최신순). 데이터가 없으면 빈 배열을 돌려준다. 부른 쪽마다 배열 복사본을 준다.
 export async function listRows(table) {
   if (!inflight.has(table)) {
@@ -31,7 +39,7 @@ async function fetchRows(table) {
   const userId = await getUserId()
   const { data, error } = await getClient()
     .from(table)
-    .select('*')
+    .select(LIST_COLUMNS[table] ?? '*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
   if (error) throw error

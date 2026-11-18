@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import TitleInput from '../components/TitleInput.jsx'
@@ -45,9 +45,11 @@ function DetailLoader({ id }) {
   }, [load])
 
   const navigate = useNavigate()
+  const location = useLocation()
   useEffect(() => {
-    if (state.status === 'redirect') navigate(`/work/${state.to}`, { replace: true })
-  }, [state, navigate])
+    // 목록에서 넘겨받은 돌아갈 주소(걸러 보기)를 회의 상세로 옮길 때도 같이 넘긴다
+    if (state.status === 'redirect') navigate(`/work/${state.to}`, { replace: true, state: location.state })
+  }, [state, navigate, location.state])
 
   if (state.status === 'ready') return state.kind === 'meeting' ? <MeetingDetail meeting={state.row} /> : <TaskDetail task={state.row} />
 
@@ -79,9 +81,12 @@ function DetailLoader({ id }) {
   )
 }
 
+// 목록이 넘겨준 돌아갈 주소(/work?show=...)가 있으면 그 걸러 보기로 돌아간다. 모양이 다르면 /work.
 function BackLink() {
+  const from = useLocation().state?.from
+  const to = typeof from === 'string' && /^\/work(\?show=[a-z]+)?$/.test(from) ? from : '/work'
   return (
-    <Link to="/work" className="inline-flex items-center gap-1.5 self-start text-sm text-gray-400 transition-colors hover:text-white">
+    <Link to={to} className="inline-flex items-center gap-1.5 self-start text-sm text-gray-400 transition-colors hover:text-white">
       <ArrowLeft className="h-4 w-4" aria-hidden="true" />
       업무 목록
     </Link>

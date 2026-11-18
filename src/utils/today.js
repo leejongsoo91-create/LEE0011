@@ -65,3 +65,26 @@ export function parseWidgetOrder(raw, defaults) {
     return defaults
   }
 }
+
+// 업무 탭 걸러 보기 (보고서 11 2단계). 주소의 ?show= 값: 할 일 · 진행 중 · 오늘·지난 마감 · 최근 7일 회의
+export const WORK_FILTERS = ['todo', 'doing', 'due', 'meetings']
+
+// 주소 값 검사: 모르는 값이면 '' (걸러 보기 없음)
+export function parseWorkFilter(value) {
+  return WORK_FILTERS.includes(value) ? value : ''
+}
+
+// 남은 할 일 목록: 미완료 업무를 마감 순으로, 고른 걸러 보기만. 마감 걸러 보기는 오늘 마감과 지난 마감(dueWork와 같은 기준).
+export function filterOpenWork(rows, show, today) {
+  const open = openWork(rows)
+  if (show === 'todo') return open.filter((row) => row.status === 'Todo')
+  if (show === 'doing') return open.filter((row) => row.status === 'In Progress')
+  if (show === 'due') return open.filter((row) => row.due_date && row.due_date <= today)
+  return open
+}
+
+// 최근 7일 안에 들어온 회의 (요약 띠의 "최근 7일 회의" 수와 같은 기준: created_at)
+export function recentMeetings(rows, now = Date.now()) {
+  const weekAgo = now - 7 * DAY_MS
+  return (rows ?? []).filter((row) => Date.parse(row.created_at) >= weekAgo)
+}

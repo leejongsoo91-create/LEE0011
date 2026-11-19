@@ -56,7 +56,8 @@ async function fetchRows(table) {
 const WORK_COLUMNS = 'id, work_key, title, reason, changes, areas, commits, report_url, status, started_at, finished_at'
 export async function listDevWorks({ start, end, q, limit = 500 } = {}) {
   const userId = await getUserId()
-  let query = getClient().from('dev_work').select(WORK_COLUMNS).eq('user_id', userId)
+  // 데이터 관리 탭에서 숨긴 작업은 작업 정리 탭에 보이지 않는다
+  let query = getClient().from('dev_work').select(WORK_COLUMNS).eq('user_id', userId).eq('hidden', false)
   if (q) {
     const like = `%${q}%`
     const hash = /^[0-9a-f]{7,40}$/.test(q) ? `,commits.cs.{${q.slice(0, 7)}}` : ''
@@ -73,11 +74,58 @@ export async function listDevWorks({ start, end, q, limit = 500 } = {}) {
 const LOG_COLUMNS = 'id, agent, kind, status, summary, ref, work_key, created_at'
 export async function listDevLogs({ start, end, keys } = {}) {
   const userId = await getUserId()
-  let query = getClient().from('dev_log').select(LOG_COLUMNS).eq('user_id', userId)
+  let query = getClient().from('dev_log').select(LOG_COLUMNS).eq('user_id', userId).eq('hidden', false)
   query = keys ? query.in('work_key', keys) : query.gte('created_at', start).lt('created_at', end)
   const { data, error } = await query.order('created_at', { ascending: false }).limit(1000)
   if (error) throw error
   return data ?? []
+}
+
+// 개발 창 "데이터 관리" 탭 (보고서 12 3단계): 원본 기록·작업 표. 거르기 값은 화면이 정한 것만 넘긴다.
+//   start·end: 기간(없으면 전체), hidden: true면 숨긴 것만 / false면 숨기지 않은 것만, offset: 더 보기
+export async function listDevLogsAdmin({ start, end, agent, kind, status, unassigned, hidden = false, offset = 0, limit = 100 } = {}) {
+  const userId = await getUserId()
+  let query = getClient().from('dev_log').select(`${LOG_COLUMNS}, hidden`).eq('user_id', userId).eq('hidden', hidden)
+  if (start && end) query = query.gte('created_at', start).lt('created_at', end)
+  if (agent) query = query.eq('agent', agent)
+  if (kind) query = query.eq('kind', kind)
+  if (status) query = query.eq('status', status)
+  // 안 묶인 것만: 정리 기록("데이터 정리:")은 원래 작업에 안 묶이므로 뺀다 (현황 숫자와 같은 기준)
+  if (unassigned) query = query.is('work_key', null).not('summary', 'like', '데이터 정리:%')
+  const { data, error } = await query.order('created_at', { ascending: false }).range(offset, offset + limit - 1)
+  if (error) throw error
+  return data ?? []
+}
+
+export async function listDevWorksAdmin({ start, end, area, status, noReason, hidden = false, offset = 0, limit = 100 } = {}) {
+  const userId = await getUserId()
+  let query = getClient().from('dev_work').select(`${WORK_COLUMNS}, hidden`).eq('user_id', userId).eq('hidden', hidden)
+  if (start && end) query = query.gte('started_at', start).lt('started_at', end)
+  if (area) query = query.contains('areas', [area])
+  if (status) query = query.eq('status', status)
+  if (noReason) query = query.is('reason', null)
+  const { data, error } = await query.order('started_at', { ascending: false }).range(offset, offset + limit - 1)
+  if (error) throw error
+  return data ?? []
+}
+
+// 데이터 관리 탭 현황 숫자: 한 줄 기록 수 · 작업에 안 묶인 기록 수 · 작업 수 (숨긴 것 빼고),
+// 가장 오래된 기록 시각 (숨긴 것도 포함: 5년 삭제 기준). 정리 기록("데이터 정리:")은 원래 작업에 안 묶이므로 안 묶인 수에서 뺀다.
+export async function devDataCounts() {
+  const userId = await getUserId()
+  const count = async (table, extra = (query) => query) => {
+    const { count: total, error } = await extra(getClient().from(table).select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('hidden', false))
+    if (error) throw error
+    return total ?? 0
+  }
+  const [logs, unassigned, works, oldest] = await Promise.all([
+    count('dev_log'),
+    count('dev_log', (query) => query.is('work_key', null).not('summary', 'like', '데이터 정리:%')),
+    count('dev_work'),
+    getClient().from('dev_log').select('created_at').eq('user_id', userId).order('created_at', { ascending: true }).limit(1),
+  ])
+  if (oldest.error) throw oldest.error
+  return { logs, unassigned, works, oldest: oldest.data?.[0]?.created_at ?? null }
 }
 
 // 내 행 하나 조회. 없으면 null.

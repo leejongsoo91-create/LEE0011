@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
 import DevWorkItem from '../components/DevWorkItem.jsx'
+// 데이터 관리 탭은 열 때 받는다 (작업 정리만 보는 때는 가볍게)
+const DevDataTab = lazy(() => import('../components/DevDataTab.jsx'))
 import Skeleton from '../components/Skeleton.jsx'
 import useDevWindow from '../hooks/useDevWindow.js'
 import { kstDate } from '../utils/controlTime.js'
@@ -15,6 +17,7 @@ const chip = (active) =>
 
 // 중앙관제 개발 창 (/control/dev, 보고서 12 2단계): 개발 팀 카드를 누르면 관제 위에 뜬다. 폰은 화면 전체, 노트북은 큰 창.
 // "작업 정리": 고른 에이전트의 최신 작업 → 주간·월간·연간 목록(펼치면 왜·무엇을·코드·보고서·진행) · 검색은 기간과 상관없이 전체.
+// "데이터 관리"(?tab=data, 3단계): 원본 기록·작업 표, 묶기·고치기·합치기·숨기기·CSV (DevDataTab).
 // 고른 값은 주소에 남긴다 (?agent= &period= &at= &q=). 뒤로 가기·Esc·✕·바깥 누르기로 닫는다.
 // 화면 전체에 띄우려고 body에 바로 그린다 (main의 @container 안에서는 fixed가 main 기준이 됨).
 // 열려 있는 동안 뒤 화면(#root)은 inert로 막아 Tab이 창 밖으로 나가지 않고, 닫으면 연 자리로 포커스를 돌려준다.
@@ -22,6 +25,7 @@ export default function DevWindow() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const today = kstDate()
+  const tab = params.get('tab') === 'data' ? 'data' : 'work'
   const agent = parseAgent(params.get('agent'))
   const period = parsePeriod(params.get('period'))
   const anchor = parseAnchor(params.get('at'), today)
@@ -104,14 +108,36 @@ export default function DevWindow() {
         className="flex h-full w-full flex-col bg-gray-900 lg:h-[90vh] lg:max-w-5xl lg:rounded-2xl lg:border lg:border-gray-700"
       >
         <header className="flex items-center justify-between gap-3 border-b border-gray-700 px-4 py-3">
-          <h2 id="dev-window-title" ref={titleRef} tabIndex={-1} className="text-lg font-bold text-white outline-none">
-            개발 <span className="ml-1 text-sm font-normal text-gray-400">작업 정리</span>
-          </h2>
+          <div className="flex min-w-0 items-center gap-3">
+            <h2 id="dev-window-title" ref={titleRef} tabIndex={-1} className="text-lg font-bold text-white outline-none">
+              개발
+            </h2>
+            <div role="tablist" aria-label="개발 창 탭" className="flex gap-1">
+              {[
+                { id: 'work', name: '작업 정리' },
+                { id: 'data', name: '데이터 관리' },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  id={`dev-tab-${item.id}`}
+                  aria-selected={tab === item.id}
+                  aria-controls="dev-tab-panel"
+                  onClick={() => update({ tab: item.id === 'work' ? '' : item.id })}
+                  className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${tab === item.id ? 'bg-gray-700 font-semibold text-white' : 'text-gray-400 hover:text-white'}`}
+                >
+                  {item.name}
+                </button>
+              ))}
+            </div>
+          </div>
           <button type="button" onClick={close} aria-label="닫기" className="rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-white">
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </header>
 
+        {tab === 'work' && (
         <div className="flex flex-col gap-2 border-b border-gray-700 px-4 py-3">
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="에이전트 고르기">
             {AGENT_FILTERS.map((item) => (
@@ -133,7 +159,15 @@ export default function DevWindow() {
           </label>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-4">
+        )}
+
+        <div id="dev-tab-panel" role="tabpanel" aria-labelledby={`dev-tab-${tab}`} className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-4">
+          {tab === 'data' ? (
+            <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+              <DevDataTab />
+            </Suspense>
+          ) : (
+          <>
           {!q && (
             <section aria-labelledby="dev-latest" className="flex flex-col gap-2">
               <h3 id="dev-latest" className="text-sm font-semibold text-gray-300">
@@ -228,6 +262,8 @@ export default function DevWindow() {
               ))
             )}
           </section>
+          </>
+          )}
         </div>
       </section>
     </div>,

@@ -104,3 +104,14 @@ test('검색어 정리: 조회식을 깨는 글자 제거, 40자', () => {
   assert.equal(cleanQuery('가'.repeat(50)).length, 40)
   assert.equal(cleanQuery(null), '')
 })
+
+test('데이터 관리 기간과 CSV: 수식 막기, 따옴표, 배열', async () => {
+  const { csvCell, dataRange, toCsv } = await import('./devWork.js')
+  assert.deepEqual(dataRange('all', '2026-11-20'), {})
+  assert.deepEqual(dataRange('week', '2026-11-20'), { start: '2026-11-16T00:00:00+09:00', end: '2026-11-23T00:00:00+09:00' })
+  assert.equal(csvCell('=HYPERLINK("x")'), `"'=HYPERLINK(""x"")"`)
+  assert.equal(csvCell('- 하나'), `"'- 하나"`)
+  assert.equal(csvCell(['화면', 'DB']), '"화면·DB"')
+  assert.equal(csvCell(null), '""')
+  assert.equal(toCsv([{ key: 'a', label: '가' }], [{ a: 1 }]), '﻿"가"\r\n"1"\r\n')
+})

@@ -24,5 +24,6 @@ export default function useDevLog() {
     }
   }, [reload])
 
-  return { ...log, now }
+  // 데이터 관리 탭에서 숨긴 기록은 관제 현황판에 보이지 않는다 (SQL 실행 전에는 hidden 칸이 없어 모두 보임)
+  return { ...log, rows: log.rows.filter((row) => row.hidden !== true), now }
 }

@@ -129,3 +129,40 @@ export const cleanQuery = (value) =>
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 40)
+
+// 데이터 관리 탭 기간: 이번 주 · 이번 달 · 올해 · 전체 → { start, end } (전체면 빈 값)
+export const DATA_PERIODS = [
+  { id: 'week', name: '이번 주' },
+  { id: 'month', name: '이번 달' },
+  { id: 'year', name: '올해' },
+  { id: 'all', name: '전체' },
+]
+export const dataRange = (id, today) => (id === 'all' ? {} : rangeToTimes(periodRange(id, today)))
+
+// 오류 이름 → 화면 문구
+export const ADMIN_ERROR = {
+  'login-required': '다시 로그인해 주세요',
+  forbidden: '권한이 없어요',
+  'no-work': '그 작업 번호가 없어요',
+  'work-hidden': '숨긴 작업이에요. "숨긴 것 보기"에서 되살린 뒤 해 주세요',
+  'bad-request': '입력 값을 확인해 주세요',
+  'bad-work-key': '작업 번호 모양이 달라요 (예: 보고서12-3, 수정-20261120-1)',
+  'bad-areas': '분야를 확인해 주세요',
+  'bad-status': '상태를 확인해 주세요',
+  'bad-report-url': '보고서 주소는 https://claude.ai/ 로 시작해야 해요',
+  'looks-secret': '비밀 값처럼 보이는 글자가 있어 저장하지 않았어요',
+}
+
+// CSV 한 칸: 따옴표로 감싸고, 엑셀이 수식으로 읽는 글자(= + - @)로 시작하면 앞에 ' 를 붙인다
+export function csvCell(value) {
+  let text = Array.isArray(value) ? value.join('·') : value == null ? '' : String(value)
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`
+  return `"${text.replace(/"/g, '""')}"`
+}
+
+// 줄 목록 → CSV 글 (엑셀이 한글을 읽도록 맨 앞에 BOM)
+export function toCsv(columns, rows) {
+  const head = columns.map((column) => csvCell(column.label)).join(',')
+  const body = rows.map((row) => columns.map((column) => csvCell(row[column.key])).join(','))
+  return `﻿${[head, ...body].join('\r\n')}\r\n`
+}

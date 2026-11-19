@@ -8,6 +8,7 @@ import Login from './pages/Login.jsx'
 // 로그인 화면은 가벼워서 처음부터 같이 받는다.
 const Home = lazy(() => import('./pages/Home.jsx'))
 const Control = lazy(() => import('./pages/Control.jsx'))
+const DevWindow = lazy(() => import('./pages/DevWindow.jsx'))
 const Schedule = lazy(() => import('./pages/Schedule.jsx'))
 const Work = lazy(() => import('./pages/Work.jsx'))
 const WorkDetail = lazy(() => import('./pages/WorkDetail.jsx'))
@@ -23,7 +24,10 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
           <Route index element={<Home />} />
-          <Route path="control" element={<Control />} />
+          <Route path="control" element={<Control />}>
+            {/* 개발 창: 관제 위에 덮어 뜬다 (보고서 12) */}
+            <Route path="dev" element={<DevWindow />} />
+          </Route>
           <Route path="schedule" element={<Schedule />} />
           <Route path="work" element={<Work />} />
           <Route path="work/:id" element={<WorkDetail />} />

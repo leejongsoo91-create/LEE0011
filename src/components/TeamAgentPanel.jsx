@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { KIND_LABEL, STATE_LABEL, STATE_STYLE, agoLabel, lastLogAt, teamStatus } from '../utils/teamStatus.js'
 import AgentLogTimeline from './AgentLogTimeline.jsx'
 import Skeleton from './Skeleton.jsx'
@@ -16,7 +17,7 @@ function BackToOverview({ className = '' }) {
   )
 }
 
-// 중앙관제 "개발 팀" 현황판: Lead Coder · QA/Reviewer · DevOps/Monitor 카드 3장 + 작업 로그.
+// 중앙관제 "개발 팀" 현황판: Lead Coder · QA/Reviewer · DevOps/Monitor 카드 3장(누르면 개발 창) + 작업 로그.
 // 실시간 연결이 아니라, Claude Code가 단계마다 남긴 기록(dev_log)으로 상태를 계산한다.
 // 기록은 관제 화면이 useDevLog()로 한 번 읽어 넘긴다 (요약 카드와 같은 값을 쓰도록).
 export default function TeamAgentPanel({ log }) {
@@ -48,7 +49,12 @@ export default function TeamAgentPanel({ log }) {
             {members.map((member) => {
               const style = STATE_STYLE[member.state]
               return (
-                <li key={member.id} className="flex flex-col gap-1 rounded-xl border border-gray-700 bg-gray-800 p-4">
+                <li key={member.id}>
+                  {/* 누르면 개발 창이 이 에이전트로 골라진 채 뜬다 (보고서 12) */}
+                  <Link
+                    to={`/control/dev?agent=${member.id}`}
+                    className="flex h-full flex-col gap-1 rounded-xl border border-gray-700 bg-gray-800 p-4 transition-colors hover:border-gray-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-300"
+                  >
                   <p className="flex items-center justify-between gap-2">
                     <span className="flex items-center gap-2 font-semibold text-white">
                       <span className={`h-2 w-2 rounded-full ${style.dot}`} aria-hidden="true" />
@@ -63,6 +69,7 @@ export default function TeamAgentPanel({ log }) {
                     {member.last ? `${KIND_LABEL[member.last.kind] ?? ''} · ${member.last.summary}` : '아직 기록이 없어요'}
                   </p>
                   {member.last && <p className="text-xs text-gray-400 tabular-nums">{agoLabel(member.last.created_at, now)}</p>}
+                  </Link>
                 </li>
               )
             })}

@@ -1,3 +1,5 @@
+import { Suspense } from 'react'
+import { Outlet } from 'react-router-dom'
 import { RefreshCw } from 'lucide-react'
 import ControlCard from '../components/ControlCard.jsx'
 import { AttentionList, RecentTasks } from '../components/ControlLists.jsx'
@@ -11,7 +13,7 @@ import { formatAt } from '../utils/controlTime.js'
 // 중앙관제: 영역별로 진행 중·대기·확인 필요를 한 화면에서 본다. (보기 전용, 결재는 텔레그램에서)
 //   에이전트 카드·확인 필요·최근 작업 → /api/control-summary (서버가 agent_tasks를 요약)
 //   업무·일정·주식·개발 팀 카드 → 브라우저가 Supabase에서 직접 (RLS로 내 것만)
-//   맨 아래 개발 팀 현황판(#dev-team): 개발 팀 카드를 누르면 여기로 내려온다
+//   맨 아래 개발 팀 현황판(#dev-team). 개발 팀 카드나 현황판 카드를 누르면 개발 창(/control/dev)이 관제 위에 뜬다 (Outlet)
 
 const newest = (rows) => rows.reduce((max, row) => (row.created_at > max ? row.created_at : max), '')
 
@@ -64,6 +66,10 @@ export default function Control() {
       <AttentionList summary={agent} failed={Boolean(summary.error)} />
       <RecentTasks summary={agent} />
       <TeamAgentPanel log={devLog} />
+      {/* 개발 창을 받는 동안 관제 화면은 그대로 두고 창 자리만 비워 둔다 */}
+      <Suspense fallback={null}>
+        <Outlet />
+      </Suspense>
     </div>
   )
 }

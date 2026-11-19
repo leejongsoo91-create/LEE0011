@@ -23,6 +23,9 @@ const LIST_COLUMNS = {
   work: 'id, title, status, progress, due_date, assignee, meeting_id, created_at',
   work_meetings: 'id, title, recorded_at, created_at',
 }
+// 목록에서 최근 것만 불러오는 표. 개발 팀 기록(dev_log)은 5년 보관이라 관제 현황판에는 최근 300줄만 쓴다
+// (기간별로 다 보는 곳은 개발 창, listDevLogs). 서버 한도(1000줄)에 걸려 최근 것이 빠지는 일도 막는다.
+const LIST_LIMIT = { dev_log: 300 }
 
 // 내 목록 조회 (최신순). 데이터가 없으면 빈 배열을 돌려준다. 부른 쪽마다 배열 복사본을 준다.
 export async function listRows(table) {
@@ -42,6 +45,37 @@ async function fetchRows(table) {
     .select(LIST_COLUMNS[table] ?? '*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
+    .limit(LIST_LIMIT[table] ?? 1000)
+  if (error) throw error
+  return data ?? []
+}
+
+// 개발 창 (보고서 12): 작업 단위 목록. 파일 목록(files)은 크니 빼고, 펼칠 때 getRow로 따로 불러온다.
+// 기간(start ≤ 시작 시각 < end)이나 검색어(q, 기간과 상관없이 전체)로 고르고, 둘 다 없으면 최근 것부터 limit개.
+// 검색어는 미리 cleanQuery로 정리해서 넘긴다.
+const WORK_COLUMNS = 'id, work_key, title, reason, changes, areas, commits, report_url, status, started_at, finished_at'
+export async function listDevWorks({ start, end, q, limit = 500 } = {}) {
+  const userId = await getUserId()
+  let query = getClient().from('dev_work').select(WORK_COLUMNS).eq('user_id', userId)
+  if (q) {
+    const like = `%${q}%`
+    const hash = /^[0-9a-f]{7,40}$/.test(q) ? `,commits.cs.{${q.slice(0, 7)}}` : ''
+    query = query.or(`work_key.ilike.${like},title.ilike.${like},reason.ilike.${like},changes.ilike.${like}${hash}`)
+  } else if (start && end) {
+    query = query.gte('started_at', start).lt('started_at', end)
+  }
+  const { data, error } = await query.order('started_at', { ascending: false }).limit(limit)
+  if (error) throw error
+  return data ?? []
+}
+
+// 개발 창: 한 줄 기록. 기간(start ≤ 시각 < end) 또는 작업 번호들(keys) 중 하나로 고른다.
+const LOG_COLUMNS = 'id, agent, kind, status, summary, ref, work_key, created_at'
+export async function listDevLogs({ start, end, keys } = {}) {
+  const userId = await getUserId()
+  let query = getClient().from('dev_log').select(LOG_COLUMNS).eq('user_id', userId)
+  query = keys ? query.in('work_key', keys) : query.gte('created_at', start).lt('created_at', end)
+  const { data, error } = await query.order('created_at', { ascending: false }).limit(1000)
   if (error) throw error
   return data ?? []
 }

@@ -18,8 +18,8 @@ export function installFakes({ mode = 'on' } = {}) {
   if (mode) process.env.AGENT_MODE = mode
   else delete process.env.AGENT_MODE
 
-  const tables = { agent_tasks: [], schedule: [], agent_settings: [], work: [], work_meetings: [], plaud_inbox: [], dev_log: [] }
-  const fake = { tables, tasks: tables.agent_tasks, schedule: tables.schedule, users: [{ id: OWNER_UID }], sent: [], edits: [], answers: [], dbCalls: 0, failDb: false, failTelegram: false, failScheduleInsert: false, failSettingsWrite: false, failWorkInsert: false, noEditedAtColumn: false }
+  const tables = { agent_tasks: [], schedule: [], agent_settings: [], work: [], work_meetings: [], plaud_inbox: [], dev_log: [], dev_work: [] }
+  const fake = { tables, tasks: tables.agent_tasks, schedule: tables.schedule, users: [{ id: OWNER_UID }], sent: [], edits: [], answers: [], dbCalls: 0, failDb: false, failTelegram: false, failScheduleInsert: false, failSettingsWrite: false, failWorkInsert: false, noEditedAtColumn: false, noWorkKeyColumn: false }
   let nextMessageId = 500
   const json = (body, status = 200) => new Response(JSON.stringify(body), { status })
 
@@ -52,6 +52,10 @@ export function installFakes({ mode = 'on' } = {}) {
     // SQL 20261114000000 실행 전: work_meetings에 edited_at 칸이 없어 400으로 거절
     if (fake.noEditedAtColumn && table === tables.work_meetings && (address.searchParams.get('select') ?? '').includes('edited_at')) {
       return json({ message: 'column work_meetings.edited_at does not exist' }, 400)
+    }
+    // SQL 20261120000000 실행 전: dev_log에 work_key 칸이 없어 400으로 거절
+    if (fake.noWorkKeyColumn && table === tables.dev_log && method === 'POST' && body?.work_key !== undefined) {
+      return json({ message: 'column dev_log.work_key does not exist' }, 400)
     }
     // eq.값 과 in.(값,값) 필터만 흉내 낸다. order·limit 등은 무시한다.
     const filters = [...address.searchParams]

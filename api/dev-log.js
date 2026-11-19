@@ -7,14 +7,18 @@
 //   3) x-dev-log-secret 헤더 하나만 본다. 두 값을 SHA-256으로 바꾼 뒤 timingSafeEqual로 비교
 //   4) 실패하면 401 {error:'unauthorized'}만. 받은 값은 응답·로그에 남기지 않는다
 //
-// 받는 본문(JSON): { agent, kind, status, summary, ref? }
-//   요약이 비밀 값처럼 보이면(긴 토큰, sk-·eyJ·sb_secret_ 등) 저장하지 않고 400.
+// 받는 본문(JSON) 두 가지:
+//   한 줄 기록   { agent, kind, status, summary, ref?, work? }  → dev_log (work = 작업 번호, 예 '보고서12-1')
+//   작업 단위    { type: 'work', work_key, title?, reason?, changes?, areas?, files?, commits?, report_url?, status?, started_at?, finished_at? }
+//                → dev_work에 없으면 만들고(제목 필수) 있으면 준 칸만 고친다 (검사·합치기는 _lib/devWork.js, 보고서 12)
+//   요약·제목·이유가 비밀 값처럼 보이면(긴 토큰, sk-·eyJ·sb_secret_ 등) 저장하지 않고 400.
 // 알림: QA 실패, 배포 실패일 때만 텔레그램으로 한 줄 보낸다. 알림이 실패해도 기록은 남는다.
 
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { ownerUserId } from './_agents/owner.js'
 import { rest } from './_agents/supabase.js'
 import { sendMessage } from './_agents/telegram.js'
+import { WORK_KEY, devWorkFields, mergeWork } from './_lib/devWork.js'
 
 export const MIN_SECRET_LENGTH = 32
 export const AGENTS = { lead: 'Lead Coder', qa: 'QA/Reviewer', devops: 'DevOps/Monitor' }
@@ -59,7 +63,48 @@ export function devLogRow(body) {
     if (SECRET_LIKE.test(body.ref)) return { error: 'looks-secret' }
     ref = body.ref.trim()
   }
-  return { row: { agent, kind, status, summary, ref } }
+  let work_key = null
+  if (body.work != null && body.work !== '') {
+    if (typeof body.work !== 'string' || !WORK_KEY.test(body.work.trim())) return { error: 'bad-work-key' }
+    work_key = body.work.trim()
+  }
+  return { row: { agent, kind, status, summary, ref, ...(work_key ? { work_key } : {}) } }
+}
+
+export const looksSecret = (text) => SECRET_LIKE.test(text)
+
+// 작업 단위 저장: 같은 작업 번호가 있으면 합쳐 고치고, 없으면 새로 만든다. 돌려주는 값: 'created' | 'updated' | { error }
+export async function saveWork(fields, user_id, retried = false) {
+  const key = encodeURIComponent(fields.work_key)
+  const [existing] = (await rest(`dev_work?select=*&user_id=eq.${user_id}&work_key=eq.${key}`)) ?? []
+  if (existing) {
+    const patch = { ...mergeWork(existing, fields), updated_at: new Date().toISOString() }
+    await rest(`dev_work?id=eq.${existing.id}&user_id=eq.${user_id}`, { method: 'PATCH', prefer: 'return=minimal', body: patch })
+    return 'updated'
+  }
+  if (!fields.title) return { error: 'need-title' }
+  try {
+    await rest('dev_work', { method: 'POST', prefer: 'return=minimal', body: { ...fields, user_id } })
+  } catch (error) {
+    // 같은 번호의 첫 요청이 동시에 와서 다른 쪽이 먼저 만들었으면(409) 한 번만 다시 읽어 합친다
+    if (error?.message !== 'supabase-409' || retried) throw error
+    return saveWork(fields, user_id, true)
+  }
+  return 'created'
+}
+
+// 작업 단위 요청 처리 (문지기를 지난 뒤)
+async function handleWork(req, res) {
+  const parsed = devWorkFields(req.body, looksSecret)
+  if (parsed.error) return res.status(400).json({ error: parsed.error })
+  try {
+    const result = await saveWork(parsed.fields, await ownerUserId())
+    if (result.error) return res.status(400).json(result)
+    return res.status(200).json({ status: result })
+  } catch (error) {
+    console.error('[dev-log] 작업 단위 저장 실패', error?.message)
+    return res.status(500).json({ error: 'store-failed' })
+  }
 }
 
 // QA 실패나 배포 실패면 텔레그램 알림 문구, 아니면 null
@@ -78,12 +123,21 @@ export default async function handler(req, res) {
     return res.status(gate.status).json(gate.body)
   }
 
+  if (req.body?.type === 'work') return handleWork(req, res)
+
   const parsed = devLogRow(req.body)
   if (parsed.error) return res.status(400).json({ error: parsed.error })
 
   try {
     const user_id = await ownerUserId()
-    await rest('dev_log', { method: 'POST', prefer: 'return=minimal', body: { ...parsed.row, user_id } })
+    try {
+      await rest('dev_log', { method: 'POST', prefer: 'return=minimal', body: { ...parsed.row, user_id } })
+    } catch (error) {
+      // SQL(20261120000000_dev_work.sql)을 실행하기 전에는 work_key 칸이 없어 400. 작업 번호만 빼고 다시 남긴다
+      if (error?.message !== 'supabase-400' || !parsed.row.work_key) throw error
+      const { work_key: _dropped, ...row } = parsed.row
+      await rest('dev_log', { method: 'POST', prefer: 'return=minimal', body: { ...row, user_id } })
+    }
   } catch (error) {
     console.error('[dev-log] 기록 저장 실패', error?.message)
     return res.status(500).json({ error: 'store-failed' })

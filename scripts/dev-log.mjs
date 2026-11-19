@@ -2,11 +2,12 @@
 // 개발 팀 작업 기록 보내기: 업무 탭 "개발 팀" 현황판에 한 줄을 남긴다. (노트북에서 Claude Code가 단계마다 부른다)
 //
 // 쓰는 법:
-//   node scripts/dev-log.mjs <agent> <kind> <status> "<한 줄 요약>" [ref]
+//   node scripts/dev-log.mjs <agent> <kind> <status> "<한 줄 요약>" [ref] [--work 보고서12-1]
 //     agent : lead | qa | devops
 //     kind  : plan | edit | test | review | commit | deploy | check
 //     status: running | pass | fail | info
 //     ref   : 커밋 해시 또는 https 주소 (선택)
+//     --work: 작업 번호 (선택, 보고서 12). 같은 작업의 기록을 중앙관제 작업 창에서 묶어 보여 준다
 //   예) node scripts/dev-log.mjs qa review pass "재검토 통과: 커밋해도 됨" d2adaa0
 //
 // 시크릿: 환경변수 DEV_LOG_SECRET (Vercel과 같은 값). 지금 창에 없으면 Windows 사용자 환경변수(레지스트리)에서 읽는다.
@@ -44,34 +45,49 @@ export function readSecret({ env = process.env, platform = process.platform, run
   }
 }
 
-async function main() {
-  const [agent, kind, status, summary, ref] = process.argv.slice(2)
-  if (!agent || !kind || !status || !summary) {
-    console.error('쓰는 법: node scripts/dev-log.mjs <lead|qa|devops> <kind> <running|pass|fail|info> "<요약>" [ref]')
-    process.exit(2)
+// 인자에서 --work 값을 뺀 나머지와 작업 번호
+export function splitWorkArg(args) {
+  const rest = []
+  let work = null
+  for (let i = 0; i < args.length; i += 1) {
+    if (args[i] === '--work') work = args[(i += 1)] ?? null
+    else rest.push(args[i])
   }
+  return { rest, work }
+}
 
-  const secret = readSecret()
-  if (!secret) {
-    console.error('[dev-log] DEV_LOG_SECRET이 없어 기록하지 않았어요')
-    process.exit(1)
-  }
-
+// 기록 입구로 보낸다. 성공하면 응답 글, 실패하면 Error (메시지에 상태 코드와 응답 앞부분, 시크릿은 넣지 않음)
+// dev-work.mjs도 같은 입구·시크릿을 쓴다.
+export async function postDevLog(body, { secret = readSecret(), url = process.env.DEV_LOG_URL || URL_DEFAULT } = {}) {
+  if (!secret) throw new Error('DEV_LOG_SECRET이 없어 기록하지 않았어요')
+  let response
   try {
-    const response = await fetch(process.env.DEV_LOG_URL || URL_DEFAULT, {
+    response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-dev-log-secret': secret },
-      body: JSON.stringify({ agent, kind, status, summary, ...(ref ? { ref } : {}) }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(10_000),
     })
-    const text = await response.text()
-    if (!response.ok) {
-      console.error(`[dev-log] 기록 실패 ${response.status} ${text.slice(0, 100)}`)
-      process.exit(1)
-    }
-    console.log(`[dev-log] 기록함 ${agent}/${kind}/${status} ${text.slice(0, 80)}`)
   } catch (error) {
-    console.error(`[dev-log] 보내지 못했어요: ${error?.name ?? 'error'}`)
+    throw new Error(`보내지 못했어요: ${error?.name ?? 'error'}`)
+  }
+  const text = await response.text()
+  if (!response.ok) throw new Error(`기록 실패 ${response.status} ${text.slice(0, 100)}`)
+  return text
+}
+
+async function main() {
+  const { rest, work } = splitWorkArg(process.argv.slice(2))
+  const [agent, kind, status, summary, ref] = rest
+  if (!agent || !kind || !status || !summary) {
+    console.error('쓰는 법: node scripts/dev-log.mjs <lead|qa|devops> <kind> <running|pass|fail|info> "<요약>" [ref] [--work 보고서12-1]')
+    process.exit(2)
+  }
+  try {
+    const text = await postDevLog({ agent, kind, status, summary, ...(ref ? { ref } : {}), ...(work ? { work } : {}) })
+    console.log(`[dev-log] 기록함 ${agent}/${kind}/${status}${work ? ` (${work})` : ''} ${text.slice(0, 80)}`)
+  } catch (error) {
+    console.error(`[dev-log] ${error.message}`)
     process.exit(1)
   }
 }

@@ -163,6 +163,14 @@ export function groupCommits(commits, { project = '대시보드' } = {}) {
   })
 }
 
+// 최근 며칠 안에 끝난(마지막 커밋이 그 안인) 작업만 (자동 기록 장치가 커밋마다 최근 것만 보내도록, 보고서 13)
+// 작업 번호의 순번은 전체 이력으로 매기므로, 일부만 보내도 번호는 늘 같다
+export function recentGroups(groups, days, now = Date.now()) {
+  if (!(days > 0)) return groups
+  const since = now - days * 24 * 60 * 60 * 1000
+  return groups.filter((group) => Date.parse(group.requests[0].finished_at) >= since)
+}
+
 // 프로젝트 이름 → GitHub 저장소 이름 (스크립트가 --repo가 맞는 저장소인지 확인할 때)
 export const PROJECT_REPOS = { 대시보드: 'LEE0011', 주식: 'stockview' }
 

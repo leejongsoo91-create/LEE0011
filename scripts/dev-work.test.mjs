@@ -1,12 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { splitWorkArg } from './dev-log.mjs'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { existsSync } from 'node:fs'
 import { parseOptions } from './dev-work.mjs'
 import { devWorkFields } from '../api/_lib/devWork.js'
 import { looksSecret } from '../api/dev-log.js'
-import { areasFor, attachChangelog, checkProjectRepo, commitBody, groupCommits, koreanTitle, parseChangelog, kstDay, parseCommitMessage, parseGitLog, parseNumstat, reportKey } from './dev-work-lib.mjs'
+import { areasFor, attachChangelog, checkProjectRepo, commitBody, recentGroups, groupCommits, koreanTitle, parseChangelog, kstDay, parseCommitMessage, parseGitLog, parseNumstat, reportKey } from './dev-work-lib.mjs'
 
 test('--work 인자: 어디에 있어도 빼내고 나머지 순서는 그대로', () => {
   assert.deepEqual(splitWorkArg(['lead', 'edit', 'pass', '요약', '--work', '보고서12-1', 'abc1234']), { rest: ['lead', 'edit', 'pass', '요약', 'abc1234'], work: '보고서12-1', project: null })
@@ -181,4 +182,22 @@ test('프로젝트·저장소 확인: 엉뚱한 저장소의 커밋이 다른 �
   assert.match(checkProjectRepo('주식', '/root/stockview', dash), /저장소가 주식/)
   assert.match(checkProjectRepo('대시보드', undefined, stock), /저장소가 대시보드/)
   assert.match(checkProjectRepo('finviz', undefined, dash), /모르는 프로젝트/)
+})
+
+test('최근 며칠 안의 작업만 (자동 기록 장치용), 0이면 전부', () => {
+  const now = Date.parse('2026-11-21T12:00:00Z')
+  const group = (finished) => ({ requests: [{ finished_at: finished }] })
+  const groups = [group('2026-11-21T01:00:00Z'), group('2026-11-19T13:00:00Z'), group('2026-11-19T11:00:00Z')]
+  assert.equal(recentGroups(groups, 2, now).length, 2)
+  assert.equal(recentGroups(groups, 0, now).length, 3)
+  assert.equal(recentGroups([group('2026-11-19T12:00:00Z')], 2, now).length, 1, '정확히 2일 전은 포함')
+})
+
+test('--recent-days에 잘못된 값이면 이력 전체를 보내지 않고 멈춘다', () => {
+  const run = (extra) => spawnSync(process.execPath, [fileURLToPath(new URL('./dev-work-backfill.mjs', import.meta.url)), ...extra], { encoding: 'utf8' })
+  for (const bad of [['--recent-days', 'abc'], ['--recent-days'], ['--recent-days', '0']]) {
+    const result = run(bad)
+    assert.equal(result.status, 2, bad.join(' '))
+    assert.match(result.stderr, /1 이상의 수/)
+  }
 })

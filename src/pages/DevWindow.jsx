@@ -8,7 +8,7 @@ const DevDataTab = lazy(() => import('../components/DevDataTab.jsx'))
 import Skeleton from '../components/Skeleton.jsx'
 import useDevWindow from '../hooks/useDevWindow.js'
 import { kstDate } from '../utils/controlTime.js'
-import { AGENT_FILTERS, PERIODS, cleanQuery, groupWorks, parseAgent, parseAnchor, parsePeriod, periodRange } from '../utils/devWork.js'
+import { AGENT_FILTERS, PERIODS, PROJECT_FILTERS, cleanQuery, groupWorks, parseAgent, parseAnchor, parsePeriod, parseProject, periodRange, projectValue, workKeyOf } from '../utils/devWork.js'
 
 const chip = (active) =>
   `rounded-full border px-3 py-1 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-gray-300 ${
@@ -17,6 +17,7 @@ const chip = (active) =>
 
 // 중앙관제 개발 창 (/control/dev, 보고서 12 2단계): 개발 팀 카드를 누르면 관제 위에 뜬다. 폰은 화면 전체, 노트북은 큰 창.
 // "작업 모아보기": 고른 역할의 최신 작업 → 주간·월간·연간 목록(펼치면 작업 이유·바꾼 내용·바뀐 파일·보고서·진행 단계) · 검색은 기간과 상관없이 전체.
+// 프로젝트(?project=dashboard|stock, 보고서 13): 대시보드·주식 사이트 작업을 같이 또는 따로 본다.
 // "기록 정리"(?tab=data): 단계별 기록·작업 목록 표, 작업에 넣기·빼기·고치기·합치기·숨기기·엑셀 파일 (DevDataTab). 화면 글자는 보고서 13에서 한글로.
 // 고른 값은 주소에 남긴다 (?agent= &period= &at= &q=). 뒤로 가기·Esc·✕·바깥 누르기로 닫는다.
 // 화면 전체에 띄우려고 body에 바로 그린다 (main의 @container 안에서는 fixed가 main 기준이 됨).
@@ -27,11 +28,12 @@ export default function DevWindow() {
   const today = kstDate()
   const tab = params.get('tab') === 'data' ? 'data' : 'work'
   const agent = parseAgent(params.get('agent'))
+  const projectId = parseProject(params.get('project'))
   const period = parsePeriod(params.get('period'))
   const anchor = parseAnchor(params.get('at'), today)
   const q = cleanQuery(params.get('q'))
   const range = periodRange(period, anchor)
-  const data = useDevWindow({ period, anchor, agent, q })
+  const data = useDevWindow({ period, anchor, agent, q, project: projectValue(projectId) })
   const [typed, setTyped] = useState(q)
   const titleRef = useRef(null)
   const dialogRef = useRef(null)
@@ -91,7 +93,8 @@ export default function DevWindow() {
   const pressedOutside = useRef(false)
 
   const groups = groupWorks(data.shown, q ? 'year' : period, { withYear: Boolean(q) })
-  const logsOf = (key) => data.logs.filter((row) => row.work_key === key)
+  // 작업의 한 줄 기록: 작업 번호와 프로젝트가 같은 것 (두 사이트의 같은 번호가 섞이지 않게)
+  const logsOf = (work) => data.logs.filter((row) => workKeyOf(row) === workKeyOf(work))
   const loading = data.status === 'loading'
 
   return createPortal(
@@ -139,6 +142,13 @@ export default function DevWindow() {
 
         {tab === 'work' && (
         <div className="flex flex-col gap-2 border-b border-gray-700 px-4 py-3">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="프로젝트 고르기">
+            {PROJECT_FILTERS.map((item) => (
+              <button key={item.id} type="button" aria-pressed={projectId === item.id} onClick={() => update({ project: item.id === 'all' ? '' : item.id })} className={chip(projectId === item.id)}>
+                {item.name}
+              </button>
+            ))}
+          </div>
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="역할 고르기">
             {AGENT_FILTERS.map((item) => (
               <button key={item.id} type="button" aria-pressed={agent === item.id} onClick={() => update({ agent: item.id === 'all' ? '' : item.id })} className={chip(agent === item.id)}>
@@ -177,7 +187,7 @@ export default function DevWindow() {
                 <Skeleton className="h-16 w-full" />
               ) : data.latest ? (
                 <ul className="rounded-xl border border-gray-700 bg-gray-800">
-                  <DevWorkItem key={data.latest.id} work={data.latest} logs={logsOf(data.latest.work_key)} defaultOpen />
+                  <DevWorkItem key={data.latest.id} work={data.latest} logs={logsOf(data.latest)} showProject={projectId === 'all'} defaultOpen />
                 </ul>
               ) : (
                 <p className="text-sm text-gray-500">아직 작업 기록이 없어요</p>
@@ -255,7 +265,7 @@ export default function DevWindow() {
                   </h4>
                   <ul className="rounded-xl border border-gray-700 bg-gray-800">
                     {group.items.map((work) => (
-                      <DevWorkItem key={work.id} work={work} logs={logsOf(work.work_key)} />
+                      <DevWorkItem key={work.id} work={work} logs={logsOf(work)} showProject={projectId === 'all'} />
                     ))}
                   </ul>
                 </section>

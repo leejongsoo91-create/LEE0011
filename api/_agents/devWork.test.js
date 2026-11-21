@@ -154,3 +154,15 @@ test('한 줄 기록: SQL 실행 전(work_key 칸 없음)이면 작업 번호만
   assert.equal(fake.tables.dev_log.length, 1)
   assert.equal(fake.tables.dev_log[0].work_key, undefined)
 })
+
+test('프로젝트: 같은 작업 번호라도 프로젝트가 다르면 따로 만든다, 모르는 프로젝트는 400 (보고서 13)', async () => {
+  assert.deepEqual((await send(START)).body, { status: 'created' })
+  assert.deepEqual((await send({ ...START, project: '주식', title: '주식 쪽' })).body, { status: 'created' })
+  assert.deepEqual(fake.tables.dev_work.map((row) => row.project), ['대시보드', '주식'])
+  await send({ type: 'work', work_key: '보고서12-1', project: '주식', status: '완료' })
+  assert.deepEqual(fake.tables.dev_work.map((row) => row.status ?? '진행 중'), ['진행 중', '완료'], '주식 쪽만 바뀐다')
+  assert.equal((await send({ ...START, project: 'finviz' })).body.error, 'bad-project')
+  assert.equal((await send({ agent: 'lead', kind: 'edit', status: 'pass', summary: 'x', project: 'finviz' })).body.error, 'bad-project')
+  assert.equal((await send({ agent: 'lead', kind: 'edit', status: 'pass', summary: 'x', project: '주식' })).status, 200)
+  assert.equal(fake.tables.dev_log.at(-1).project, '주식')
+})

@@ -53,11 +53,12 @@ async function fetchRows(table) {
 // 개발 창 (보고서 12): 작업 단위 목록. 파일 목록(files)은 크니 빼고, 펼칠 때 getRow로 따로 불러온다.
 // 기간(start ≤ 시작 시각 < end)이나 검색어(q, 기간과 상관없이 전체)로 고르고, 둘 다 없으면 최근 것부터 limit개.
 // 검색어는 미리 cleanQuery로 정리해서 넘긴다.
-const WORK_COLUMNS = 'id, work_key, title, reason, changes, areas, commits, report_url, status, started_at, finished_at'
-export async function listDevWorks({ start, end, q, limit = 500 } = {}) {
+const WORK_COLUMNS = 'id, project, work_key, title, reason, changes, areas, commits, report_url, status, started_at, finished_at'
+export async function listDevWorks({ start, end, q, project, limit = 500 } = {}) {
   const userId = await getUserId()
   // 데이터 관리 탭에서 숨긴 작업은 작업 정리 탭에 보이지 않는다
   let query = getClient().from('dev_work').select(WORK_COLUMNS).eq('user_id', userId).eq('hidden', false)
+  if (project) query = query.eq('project', project)
   if (q) {
     const like = `%${q}%`
     const hash = /^[0-9a-f]{7,40}$/.test(q) ? `,commits.cs.{${q.slice(0, 7)}}` : ''
@@ -71,7 +72,7 @@ export async function listDevWorks({ start, end, q, limit = 500 } = {}) {
 }
 
 // 개발 창: 한 줄 기록. 기간(start ≤ 시각 < end) 또는 작업 번호들(keys) 중 하나로 고른다.
-const LOG_COLUMNS = 'id, agent, kind, status, summary, ref, work_key, created_at'
+const LOG_COLUMNS = 'id, project, agent, kind, status, summary, ref, work_key, created_at'
 export async function listDevLogs({ start, end, keys } = {}) {
   const userId = await getUserId()
   let query = getClient().from('dev_log').select(LOG_COLUMNS).eq('user_id', userId).eq('hidden', false)
@@ -83,10 +84,11 @@ export async function listDevLogs({ start, end, keys } = {}) {
 
 // 개발 창 "데이터 관리" 탭 (보고서 12 3단계): 원본 기록·작업 표. 거르기 값은 화면이 정한 것만 넘긴다.
 //   start·end: 기간(없으면 전체), hidden: true면 숨긴 것만 / false면 숨기지 않은 것만, offset: 더 보기
-export async function listDevLogsAdmin({ start, end, agent, kind, status, unassigned, hidden = false, offset = 0, limit = 100 } = {}) {
+export async function listDevLogsAdmin({ start, end, project, agent, kind, status, unassigned, hidden = false, offset = 0, limit = 100 } = {}) {
   const userId = await getUserId()
   let query = getClient().from('dev_log').select(`${LOG_COLUMNS}, hidden`).eq('user_id', userId).eq('hidden', hidden)
   if (start && end) query = query.gte('created_at', start).lt('created_at', end)
+  if (project) query = query.eq('project', project)
   if (agent) query = query.eq('agent', agent)
   if (kind) query = query.eq('kind', kind)
   if (status) query = query.eq('status', status)
@@ -97,10 +99,11 @@ export async function listDevLogsAdmin({ start, end, agent, kind, status, unassi
   return data ?? []
 }
 
-export async function listDevWorksAdmin({ start, end, area, status, noReason, hidden = false, offset = 0, limit = 100 } = {}) {
+export async function listDevWorksAdmin({ start, end, project, area, status, noReason, hidden = false, offset = 0, limit = 100 } = {}) {
   const userId = await getUserId()
   let query = getClient().from('dev_work').select(`${WORK_COLUMNS}, hidden`).eq('user_id', userId).eq('hidden', hidden)
   if (start && end) query = query.gte('started_at', start).lt('started_at', end)
+  if (project) query = query.eq('project', project)
   if (area) query = query.contains('areas', [area])
   if (status) query = query.eq('status', status)
   if (noReason) query = query.is('reason', null)

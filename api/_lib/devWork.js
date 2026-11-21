@@ -7,6 +7,9 @@ export const WORK_KEY = /^(보고서\d{1,3}(-\d{1,2})?|수정-\d{8}-\d{1,3})$/
 // '데이터'는 보고서 13(SQL 20261122000000)에서 추가: 주식 사이트의 데이터 수집 코드
 export const AREAS = ['화면', '에이전트', 'DB', '보안', '개발도구', '문서', '설정', '데이터']
 export const WORK_STATUSES = ['진행 중', '완료', '되돌림']
+// 프로젝트 (보고서 13, SQL 20261122000000): 이 대시보드와 주식 사이트(StockView). 작업 번호는 프로젝트마다 따로다
+export const PROJECTS = ['대시보드', '주식']
+export const DEFAULT_PROJECT = '대시보드'
 export const LIMITS = { title: 200, reason: 1000, changes: 2000, files: 300, commits: 50, path: 200, url: 300 }
 
 const COMMIT = /^[0-9a-f]{7,40}$/
@@ -40,7 +43,9 @@ export function devWorkFields(body, looksSecret) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { error: 'bad-request' }
   const key = typeof body.work_key === 'string' ? body.work_key.trim() : ''
   if (!WORK_KEY.test(key)) return { error: 'bad-work-key' }
-  const fields = { work_key: key }
+  const project = body.project ?? DEFAULT_PROJECT
+  if (!PROJECTS.includes(project)) return { error: 'bad-project' }
+  const fields = { work_key: key, project }
 
   for (const name of ['title', 'reason', 'changes']) {
     if (!(name in body)) continue
@@ -121,6 +126,7 @@ export function mergeFiles(before = [], after = []) {
 export function mergeWork(existing, fields) {
   const patch = { ...fields }
   delete patch.work_key
+  delete patch.project
   if (fields.commits) {
     const known = new Set(existing.commits ?? [])
     const fresh = fields.commits.filter((hash) => !known.has(hash))

@@ -21,11 +21,23 @@ export function parseNumstat(text) {
   return files
 }
 
-// 바뀐 파일 경로(와 제목·본문)로 분야를 정한다. 한글 분야: 화면 · 에이전트 · DB · 보안 · 개발도구 · 문서 · 설정
-export function areasFor(paths, text = '') {
+// 주식 사이트(StockView, 파이썬 Flask) 파일 → 분야 (보고서 13)
+function stockArea(path) {
+  if (/^(templates|static)\//.test(path)) return '화면'
+  if (/^(data\/|data_fetcher\.py$|fetch_[\w]*\.py$|cache\.py$|[\w]*cache[\w]*\.json$)/.test(path)) return '데이터'
+  if (/^(api\/|app\.py$|[\w]*_api\.py$)/.test(path)) return '에이전트'
+  if (/^(scripts|\.claude|\.codex|\.agents)\//.test(path)) return '개발도구'
+  if (/\.md$/i.test(path) || /^docs\//.test(path)) return '문서'
+  return '설정'
+}
+
+// 바뀐 파일 경로(와 제목·본문)로 분야를 정한다. 한글 분야: 화면 · 에이전트 · DB · 보안 · 개발도구 · 문서 · 설정 · 데이터
+// project가 '주식'이면 주식 사이트 파일 모양으로 나눈다.
+export function areasFor(paths, text = '', project = '대시보드') {
   const areas = new Set()
   for (const path of paths) {
-    if (/^(src|public)\/|^index\.html$/.test(path)) areas.add('화면')
+    if (project === '주식') areas.add(stockArea(path))
+    else if (/^(src|public)\/|^index\.html$/.test(path)) areas.add('화면')
     else if (/^api\//.test(path)) areas.add('에이전트')
     else if (/^supabase\//.test(path)) areas.add('DB')
     else if (/^(scripts|\.claude|\.codex|\.agents)\//.test(path)) areas.add('개발도구')
@@ -34,6 +46,16 @@ export function areasFor(paths, text = '') {
   }
   if (/보안|CSP|RLS|시크릿|권한/.test(text)) areas.add('보안')
   return [...areas]
+}
+
+// 커밋 제목 머리글(feat: 등)을 한글로: "feat: 시장 거래 창" → "기능: 시장 거래 창" (보고서 13)
+const PREFIX_LABEL = { feat: '기능', fix: '수정', docs: '문서', chore: '정리', refactor: '다듬기', test: '테스트', tune: '조정', deploy: '배포', perf: '성능', style: '모양', build: '빌드', ci: '빌드', revert: '되돌림' }
+export function koreanTitle(subject) {
+  const match = /^([a-z]+(?:\+[a-z]+)*)(\([^)]*\))?!?:\s*(.*)$/i.exec(subject ?? '')
+  if (!match) return subject ?? ''
+  const labels = match[1].toLowerCase().split('+').map((word) => PREFIX_LABEL[word])
+  if (labels.some((label) => !label)) return subject
+  return `${[...new Set(labels)].join('·')}: ${match[3]}`
 }
 
 // 커밋 메시지 → 제목, 이유('왜:' 줄), 작업 번호('작업:' 줄), 바꾼 내용('- ' 줄들). 공동 작성자 줄은 뺀다
@@ -78,15 +100,16 @@ export function parseGitLog(text) {
 
 // 커밋 하나 → 작업 단위로 보낼 본문 (dev-work commit). 파일 줄 수는 커밋 하나씩 보낸다 (서버가 이미 받은 커밋은 다시 더하지 않음).
 // 제목은 처음 만들 때만 쓰이고(커밋 제목), 이미 있는 작업이면 서버가 제목·이유를 그대로 둔다.
-export function commitBody(key, commit) {
+export function commitBody(key, commit, project = '대시보드') {
   const { subject, reason, changes } = parseCommitMessage(commit.message)
   return {
     type: 'work',
     work_key: key,
-    title: subject.slice(0, 200) || '(제목 없음)',
+    ...(project !== '대시보드' ? { project } : {}),
+    title: koreanTitle(subject).slice(0, 200) || '(제목 없음)',
     commits: [commit.hash.slice(0, 7)],
     files: commit.files.slice(0, MAX_FILES),
-    areas: areasFor(commit.files.map((file) => file.path), commit.message),
+    areas: areasFor(commit.files.map((file) => file.path), commit.message, project),
     ...(changes.length ? { changes: changes.join('\n') } : {}),
     ...(reason ? { reason } : {}),
   }
@@ -97,7 +120,8 @@ export function commitBody(key, commit) {
 //   순번은 손으로 붙인 같은 날 번호를 건너뛴다.
 //   첫 본문에 제목·이유·바꾼 내용·상태·시각과 첫 커밋, 나머지 본문은 커밋 하나씩 (서버가 커밋별로 줄 수를 더함)
 //   커밋이 여럿인 작업은 바꾼 내용을 커밋 제목 목록으로, 하나면 그 커밋의 '- ' 줄로
-export function groupCommits(commits) {
+//   project: '주식'이면 본문마다 project를 붙이고 분야를 주식 사이트 파일 모양으로. 제목 머리글(feat: 등)은 한글로
+export function groupCommits(commits, { project = '대시보드' } = {}) {
   const parsedAll = commits.map((commit) => ({ ...commit, parsed: parseCommitMessage(commit.message) }))
   const explicit = new Set(parsedAll.map((commit) => commit.parsed.workKey).filter((key) => key && WORK_KEY.test(key)))
   const groups = new Map()
@@ -119,21 +143,123 @@ export function groupCommits(commits) {
   return [...groups].map(([work_key, list]) => {
     const first = list[0]
     const last = list.at(-1)
-    const changes = list.length > 1 ? list.map((commit) => `- ${commit.parsed.subject}`) : first.parsed.changes
+    const changes = list.length > 1 ? list.map((commit) => `- ${koreanTitle(commit.parsed.subject)}`) : first.parsed.changes
     const reason = list.map((commit) => commit.parsed.reason).find(Boolean)
     const reverted = /^(revert|되돌리기|되돌림)/i.test(last.parsed.subject)
     const allPaths = list.flatMap((commit) => commit.files.map((file) => file.path))
-    const perCommit = list.map((commit) => ({ type: 'work', work_key, commits: [commit.hash.slice(0, 7)], files: commit.files.slice(0, MAX_FILES) }))
+    const tag = project !== '대시보드' ? { project } : {}
+    const perCommit = list.map((commit) => ({ type: 'work', work_key, ...tag, commits: [commit.hash.slice(0, 7)], files: commit.files.slice(0, MAX_FILES) }))
     perCommit[0] = {
       ...perCommit[0],
-      title: first.parsed.subject.slice(0, 200) || '(제목 없음)',
+      title: koreanTitle(first.parsed.subject).slice(0, 200) || '(제목 없음)',
       ...(reason ? { reason } : {}),
       ...(changes.length ? { changes: changes.join('\n').slice(0, 2000) } : {}),
-      areas: areasFor(allPaths, list.map((commit) => commit.message).join('\n')),
+      areas: areasFor(allPaths, list.map((commit) => commit.message).join('\n'), project),
       status: reverted ? '되돌림' : '완료',
       started_at: first.at,
       finished_at: last.at,
     }
-    return { work_key, requests: perCommit.slice(0, 50) }
+    return { work_key, hashes: list.map((commit) => commit.hash), subjects: list.map((commit) => commit.parsed.subject), requests: perCommit.slice(0, 50) }
   })
+}
+
+// 프로젝트 이름 → GitHub 저장소 이름 (스크립트가 --repo가 맞는 저장소인지 확인할 때)
+export const PROJECT_REPOS = { 대시보드: 'LEE0011', 주식: 'stockview' }
+
+// --project·--repo 검사: 프로젝트는 아는 이름만, 대시보드가 아니면 --repo 필수, --repo를 주면 --project도 필수,
+// 그 저장소의 origin 주소가 프로젝트 저장소 이름으로 끝나야 한다. 문제가 있으면 문구, 없으면 null
+export function checkProjectRepo(project, repo, originUrl, { projectGiven = true } = {}) {
+  if (!Object.hasOwn(PROJECT_REPOS, project)) return `모르는 프로젝트예요: ${project} (대시보드 · 주식)`
+  if (repo && !projectGiven) return '--repo를 주면 --project도 같이 주세요 (예: --project 주식 --repo /root/stockview)'
+  if (project !== '대시보드' && !repo) return `${project} 작업은 --repo로 그 저장소를 알려 주세요 (예: --repo /root/stockview)`
+  const name = PROJECT_REPOS[project]
+  if (!new RegExp(`[/:]${name}(\\.git)?/?$`, 'i').test(String(originUrl ?? '').trim())) {
+    return `저장소가 ${project}(${name})가 아니에요: ${String(originUrl ?? '').trim() || '(origin 없음)'}`
+  }
+  return null
+}
+
+// 주식 사이트 docs/CHANGELOG.md → [{ day: 'YYYYMMDD', kind, content, commits: [해시…] }] 와 못 읽은 줄 수
+//   "## 2026-11" 아래 "- 11-21 | 구분 | 내용 | 커밋" 줄. 날짜가 "07-22~23"처럼 범위면 시작일로.
+//   커밋 칸의 해시를 모두 뽑는다 ("9b140c1, 1989d3d"). "(이번 커밋)"이면 빈 목록
+export function parseChangelog(text) {
+  const entries = []
+  let skipped = 0
+  let year = null
+  for (const line of String(text ?? '').split('\n')) {
+    const head = /^##\s+(\d{4})-(\d{2})\s*$/.exec(line)
+    if (head) {
+      year = head[1]
+      continue
+    }
+    if (!/^-\s+\d{2}-\d{2}/.test(line)) continue
+    const match = /^-\s+(\d{2})-(\d{2})(?:~\d{2}(?:-\d{2})?)?\s*\|\s*([^|]*?)\s*\|\s*(.*?)\s*\|\s*([^|]*?)\s*$/.exec(line)
+    if (!match || !year) {
+      skipped += 1
+      continue
+    }
+    const commits = match[5].match(/\b[0-9a-f]{7,40}\b/g) ?? []
+    entries.push({ day: `${year}${match[1]}${match[2]}`, kind: match[3], content: match[4].replace(/\*\*/g, '').replace(/`/g, '').trim(), commits })
+  }
+  return Object.assign(entries, { skipped })
+}
+
+// 글에서 두 글자 이상 낱말 (짝 맞추기 점수용)
+const words = (text) => new Set((String(text ?? '').toLowerCase().match(/[가-힣a-z0-9]{2,}/g) ?? []))
+const nextDay = (day) => {
+  const date = new Date(Date.UTC(Number(day.slice(0, 4)), Number(day.slice(4, 6)) - 1, Number(day.slice(6, 8)) + 1))
+  return date.toISOString().slice(0, 10).replace(/-/g, '')
+}
+
+// 변경 기록 줄을 지난 커밋 묶음(groupCommits 결과)과 짝짓는다. 짝이 확실한 것만 그 작업의 "바꾼 내용" 맨 앞에 붙인다
+// (커밋 메시지의 '- ' 줄은 그 뒤에 남긴다, 2000자 안에서).
+//   1) 기록 줄의 커밋 칸에 해시가 있으면 그 커밋이 든 작업과 짝 (한 작업에 여러 줄도 붙음).
+//      해시가 3개 이하면 그 커밋들의 작업 모두에, 더 많으면(여러 단계를 묶은 요약 줄) 첫 작업에만 붙인다
+//   2) 아니면 같은 한국 날짜(자정 넘겨 커밋한 경우를 위해 다음 날까지)의 작업 중
+//      커밋 제목과 겹치는 낱말이 가장 많은 것(2개 이상). 이 방식은 한 작업에 한 줄
+// 돌려주는 값: { paired, unpaired: [짝 못 지은 기록 줄] }
+export function attachChangelog(groups, entries) {
+  const lines = new Map() // 작업 → 붙일 기록 줄들
+  const add = (group, entry) => {
+    if (!lines.has(group)) lines.set(group, [])
+    lines.get(group).push(`- [${entry.kind}] ${entry.content}`)
+  }
+  const byDay = new Map()
+  for (const group of groups) {
+    const day = kstDay(group.requests[0].started_at)
+    if (!byDay.has(day)) byDay.set(day, [])
+    byDay.get(day).push(group)
+  }
+  const unpaired = []
+  const scored = []
+  for (const entry of entries) {
+    if (entry.commits?.length) {
+      const matched = groups.filter((item) => item.hashes.some((hash) => entry.commits.some((short) => hash.startsWith(short))))
+      const targets = entry.commits.length <= 3 ? matched : matched.slice(0, 1)
+      for (const group of targets) add(group, entry)
+      if (targets.length === 0) unpaired.push(entry)
+      continue
+    }
+    const content = words(entry.content)
+    const candidates = [...(byDay.get(entry.day) ?? []), ...(byDay.get(nextDay(entry.day)) ?? [])].map((group) => ({
+      group,
+      score: [...words(group.subjects.join(' '))].filter((word) => content.has(word)).length,
+    }))
+    scored.push({ entry, candidates: candidates.filter((item) => item.score >= 2) })
+  }
+  // 낱말 겹침 짝: 점수가 높은 것부터, 한 작업에 한 줄 (해시로 이미 줄이 붙은 작업은 빼고)
+  const pairs = scored.flatMap(({ entry, candidates }) => candidates.map((item) => ({ entry, ...item }))).sort((a, b) => b.score - a.score)
+  const done = new Set()
+  for (const { entry, group } of pairs) {
+    if (done.has(entry) || lines.has(group)) continue
+    add(group, entry)
+    done.add(entry)
+  }
+  for (const { entry } of scored) if (!done.has(entry)) unpaired.push(entry)
+  for (const [group, added] of lines) {
+    const head = group.requests[0]
+    head.changes = [...added, head.changes].filter(Boolean).join('\n').slice(0, 2000)
+    head.paired = true
+  }
+  return { paired: entries.length - unpaired.length, unpaired }
 }

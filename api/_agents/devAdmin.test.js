@@ -29,13 +29,13 @@ beforeEach(() => {
     return base(url, options)
   }
   fake.tables.dev_log.push(
-    { id: L1, user_id: OWNER_UID, agent: 'lead', kind: 'edit', status: 'pass', summary: '수정', work_key: null, hidden: false },
-    { id: L2, user_id: OWNER_UID, agent: 'qa', kind: 'test', status: 'pass', summary: '테스트', work_key: '보고서12-1', hidden: false },
-    { id: L3, user_id: OTHER_UID, agent: 'lead', kind: 'edit', status: 'pass', summary: '남의 것', work_key: null, hidden: false },
+    { id: L1, user_id: OWNER_UID, agent: 'lead', kind: 'edit', status: 'pass', summary: '수정', work_key: null, project: '대시보드', hidden: false },
+    { id: L2, user_id: OWNER_UID, agent: 'qa', kind: 'test', status: 'pass', summary: '테스트', work_key: '보고서12-1', project: '대시보드', hidden: false },
+    { id: L3, user_id: OTHER_UID, agent: 'lead', kind: 'edit', status: 'pass', summary: '남의 것', work_key: null, project: '대시보드', hidden: false },
   )
   fake.tables.dev_work.push(
-    { id: W1, user_id: OWNER_UID, work_key: '보고서12-1', title: '하나', reason: null, changes: '- 가', areas: ['DB'], files: [{ path: 'a.js', added: 1, removed: 0 }], commits: ['aaaaaaa'], status: '완료', started_at: '2026-11-20T01:00:00.000Z', finished_at: '2026-11-20T02:00:00.000Z', hidden: false },
-    { id: W2, user_id: OWNER_UID, work_key: '보고서12-2', title: '둘', reason: '왜 둘', changes: '- 나', areas: ['화면'], files: [{ path: 'a.js', added: 2, removed: 1 }], commits: ['bbbbbbb'], status: '진행 중', started_at: '2026-11-19T01:00:00.000Z', finished_at: null, hidden: false },
+    { id: W1, user_id: OWNER_UID, project: '대시보드', work_key: '보고서12-1', title: '하나', reason: null, changes: '- 가', areas: ['DB'], files: [{ path: 'a.js', added: 1, removed: 0 }], commits: ['aaaaaaa'], status: '완료', started_at: '2026-11-20T01:00:00.000Z', finished_at: '2026-11-20T02:00:00.000Z', hidden: false },
+    { id: W2, user_id: OWNER_UID, project: '대시보드', work_key: '보고서12-2', title: '둘', reason: '왜 둘', changes: '- 나', areas: ['화면'], files: [{ path: 'a.js', added: 2, removed: 1 }], commits: ['bbbbbbb'], status: '진행 중', started_at: '2026-11-19T01:00:00.000Z', finished_at: null, hidden: false },
   )
 })
 
@@ -128,4 +128,16 @@ test('본문 검사: 모르는 동작, id 모양, 개수 한도', () => {
   assert.equal(parseAdmin({ action: 'hide', target: 'log', ids: [L1], hidden: 'yes' }).error, 'bad-request')
   assert.equal(parseAdmin({ action: 'assign', log_ids: [L1], work_key: 'R12' }).error, 'bad-work-key')
   assert.equal(mergedWork({ finished_at: null }, { finished_at: '2026-11-20T00:00:00Z' }).finished_at, '2026-11-20T00:00:00Z')
+})
+
+test('프로젝트: 작업은 그 프로젝트 안에서만 찾고, 묶으면 기록의 프로젝트도 맞춘다 (보고서 13)', async () => {
+  const W3 = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
+  fake.tables.dev_work.push({ id: W3, user_id: OWNER_UID, project: '주식', work_key: '수정-20261120-1', title: '주식 작업', commits: [], files: [], areas: [], hidden: false })
+  assert.equal((await call({ action: 'assign', log_ids: [L1], work_key: '수정-20261120-1' })).status, 404, '대시보드에는 그 번호가 없다')
+  assert.equal((await call({ action: 'assign', log_ids: [L1], work_key: '수정-20261120-1', project: '주식' })).status, 200)
+  const log = fake.tables.dev_log.find((row) => row.id === L1)
+  assert.deepEqual([log.work_key, log.project], ['수정-20261120-1', '주식'])
+  assert.equal(audits().at(-1).summary, '데이터 정리: [주식] 기록 1줄을 수정-20261120-1에 묶음')
+  assert.equal((await call({ action: 'edit', work_key: '보고서12-1', project: '주식', fields: { title: 'x' } })).status, 404)
+  assert.equal(parseAdmin({ action: 'unassign', log_ids: [L1], project: 'finviz' }).error, 'bad-project')
 })

@@ -21,7 +21,19 @@ export const areaLabel = (area) => AREA_LABEL[area] ?? area
 // 작업이 거치는 단계 순서 (진행 줄과 "지금 단계"에 쓴다)
 export const STEPS = ['plan', 'edit', 'test', 'review', 'commit', 'deploy', 'check']
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
-const REPO = 'https://github.com/leejongsoo91-create/LEE0011'
+// 프로젝트 (보고서 13): 주소 값(dashboard·stock) ↔ DB 값(대시보드·주식), 코드 링크를 걸 GitHub 저장소
+export const PROJECT_FILTERS = [
+  { id: 'all', name: '전체', value: null },
+  { id: 'dashboard', name: '대시보드', value: '대시보드' },
+  { id: 'stock', name: '주식', value: '주식' },
+]
+const REPOS = { 대시보드: 'https://github.com/leejongsoo91-create/LEE0011', 주식: 'https://github.com/leejongsoo91-create/stockview' }
+export const parseProject = (value) => (PROJECT_FILTERS.some((item) => item.id === value) ? value : 'all')
+export const projectValue = (id) => PROJECT_FILTERS.find((item) => item.id === id)?.value ?? null
+// 기록의 프로젝트 (SQL 전 기록·칸이 없으면 대시보드)
+export const projectOf = (row) => row?.project ?? '대시보드'
+// 작업과 한 줄 기록을 잇는 열쇠: 작업 번호는 프로젝트마다 따로라 둘을 같이 쓴다
+export const workKeyOf = (row) => `${projectOf(row)}|${row?.work_key}`
 
 // 주소 값 검사: 모르는 값이면 기본값
 export const parsePeriod = (value) => (PERIODS.some((period) => period.id === value) ? value : 'week')
@@ -91,8 +103,8 @@ export function groupWorks(works, kind, { withYear = false } = {}) {
 // 역할 거르기: 개발은 모든 작업, 검토·테스트·운영은 그 역할의 기록이 있는 작업만 (logs = 작업들의 한 줄 기록)
 export function filterByAgent(works, logs, agent) {
   if (agent === 'all' || agent === 'lead') return works ?? []
-  const keys = new Set((logs ?? []).filter((row) => row.agent === agent && row.work_key).map((row) => row.work_key))
-  return (works ?? []).filter((work) => keys.has(work.work_key))
+  const keys = new Set((logs ?? []).filter((row) => row.agent === agent && row.work_key).map(workKeyOf))
+  return (works ?? []).filter((work) => keys.has(workKeyOf(work)))
 }
 
 // 작업의 진행 줄: 단계별 가장 최근 기록 (STEPS 순서, 기록 없는 단계는 뺀다)
@@ -123,8 +135,9 @@ export const fileTotals = (files) =>
   (files ?? []).reduce((sum, file) => ({ added: sum.added + file.added, removed: sum.removed + file.removed }), { added: 0, removed: 0 })
 
 // GitHub 링크 (커밋 해시 모양일 때만)
-export const commitUrl = (hash) => (/^[0-9a-f]{7,40}$/.test(hash ?? '') ? `${REPO}/commit/${hash}` : null)
-export const fileUrl = (hash, path) => (commitUrl(hash) && path ? `${REPO}/blob/${hash}/${path}` : null)
+export const commitUrl = (hash, project = '대시보드') =>
+  /^[0-9a-f]{7,40}$/.test(hash ?? '') && REPOS[project] ? `${REPOS[project]}/commit/${hash}` : null
+export const fileUrl = (hash, path, project = '대시보드') => (commitUrl(hash, project) && path ? `${REPOS[project]}/blob/${hash}/${path}` : null)
 
 // 검색어 정리: DB 조회식(or=…)을 깨는 글자를 빼고 앞뒤 공백 정리, 40자까지
 export const cleanQuery = (value) =>

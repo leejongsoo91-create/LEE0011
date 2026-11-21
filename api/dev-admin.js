@@ -14,11 +14,12 @@
 //   { action: 'hide',     target: 'log'|'work', ids: [uuid…], hidden: true|false }   숨기기·되살리기
 //   { action: 'edit',     work_key, fields: { title?, reason?, changes?, areas?, status?, report_url? } }
 //   { action: 'merge',    from: 작업 번호, into: 작업 번호 }   from의 커밋·파일·기록을 into로 옮기고 from은 숨김
+//   모든 동작에 project(대시보드·주식, 없으면 대시보드)를 붙일 수 있다. 작업은 그 프로젝트 안에서만 찾는다 (보고서 13)
 
 import { ownerUserId } from './_agents/owner.js'
 import { rest } from './_agents/supabase.js'
 import { userIdFromToken } from './_lib/session.js'
-import { AREAS, LIMITS, WORK_KEY, devWorkFields, mergeFiles } from './_lib/devWork.js'
+import { AREAS, DEFAULT_PROJECT, LIMITS, PROJECTS, WORK_KEY, devWorkFields, mergeFiles } from './_lib/devWork.js'
 import { looksSecret } from './dev-log.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -29,9 +30,17 @@ const idList = (ids) => Array.isArray(ids) && ids.length > 0 && ids.length <= MA
 const key = (value) => (typeof value === 'string' && WORK_KEY.test(value) ? value : null)
 const badKey = (...values) => values.some((value) => typeof value === 'string' && value && !WORK_KEY.test(value))
 
-// 본문 검사 → { action, … } 또는 { error }
+// 본문 검사 → { action, project, … } 또는 { error }. project(대시보드·주식)가 없으면 대시보드
 export function parseAdmin(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { error: 'bad-request' }
+  const parsed = parseAction(body)
+  if (parsed.error) return parsed
+  const project = body.project ?? DEFAULT_PROJECT
+  if (!PROJECTS.includes(project)) return { error: 'bad-project' }
+  return { ...parsed, project }
+}
+
+function parseAction(body) {
   const { action } = body
   if (action === 'assign') {
     if (badKey(body.work_key)) return { error: 'bad-work-key' }
@@ -53,7 +62,7 @@ export function parseAdmin(body) {
     const clearReport = 'report_url' in fields && (fields.report_url == null || fields.report_url === '')
     const parsed = devWorkFields({ work_key: body.work_key, ...fields }, looksSecret)
     if (parsed.error) return parsed
-    const patch = Object.fromEntries(Object.entries(parsed.fields).filter(([name]) => name !== 'work_key'))
+    const patch = Object.fromEntries(Object.entries(parsed.fields).filter(([name]) => name !== 'work_key' && name !== 'project'))
     if (clearReport) patch.report_url = null
     return { action, work_key: body.work_key, patch }
   }
@@ -83,8 +92,8 @@ export function mergedWork(into, from) {
 const enc = encodeURIComponent
 const inIds = (ids) => `in.(${ids.join(',')})`
 
-async function findWork(uid, workKey) {
-  const [row] = (await rest(`dev_work?select=*&user_id=eq.${uid}&work_key=eq.${enc(workKey)}`)) ?? []
+async function findWork(uid, project, workKey) {
+  const [row] = (await rest(`dev_work?select=*&user_id=eq.${uid}&project=eq.${enc(project)}&work_key=eq.${enc(workKey)}`)) ?? []
   return row ?? null
 }
 
@@ -99,9 +108,10 @@ const usable = (work) => (!work ? { error: 'no-work', status: 404 } : work.hidde
 // 정리 한 건 처리 → { changed, summary } 또는 { error, status }
 export async function runAdmin(op, uid) {
   if (op.action === 'assign') {
-    const problem = usable(await findWork(uid, op.work_key))
+    const problem = usable(await findWork(uid, op.project, op.work_key))
     if (problem) return problem
-    const changed = await patch(`dev_log?id=${inIds(op.ids)}&user_id=eq.${uid}`, { work_key: op.work_key })
+    // 기록의 프로젝트도 그 작업의 프로젝트로 맞춘다
+    const changed = await patch(`dev_log?id=${inIds(op.ids)}&user_id=eq.${uid}`, { work_key: op.work_key, project: op.project })
     return { changed, summary: `데이터 정리: 기록 ${changed}줄을 ${op.work_key}에 묶음` }
   }
   if (op.action === 'unassign') {
@@ -115,7 +125,7 @@ export async function runAdmin(op, uid) {
     return { changed, summary: `데이터 정리: ${what} ${changed}개 ${op.hidden ? '숨김' : '되살림'}` }
   }
   if (op.action === 'edit') {
-    const work = await findWork(uid, op.work_key)
+    const work = await findWork(uid, op.project, op.work_key)
     const problem = usable(work)
     if (problem) return problem
     await patch(`dev_work?id=eq.${work.id}&user_id=eq.${uid}`, { ...op.patch, updated_at: new Date().toISOString() })
@@ -123,13 +133,13 @@ export async function runAdmin(op, uid) {
     return { changed: 1, summary: `데이터 정리: ${op.work_key} 고침 (${Object.keys(op.patch).map((name) => names[name]).join('·')})` }
   }
   if (op.action === 'merge') {
-    const [from, into] = [await findWork(uid, op.from), await findWork(uid, op.into)]
+    const [from, into] = [await findWork(uid, op.project, op.from), await findWork(uid, op.project, op.into)]
     const problem = usable(from) ?? usable(into)
     if (problem) return problem
     // 한 번에 처리되지 않으므로, 중간에 실패해도 같은 합치기를 다시 했을 때 두 번 더해지지 않는 순서로 한다:
     // 기록 옮기기 → from 숨기기 → into에 합친 값 쓰기. from을 숨긴 뒤에는 같은 합치기가 work-hidden으로 막힌다.
     // (마지막 쓰기만 실패하면 숨긴 것 보기에서 from을 되살린 뒤 다시 합치면 된다)
-    const moved = await patch(`dev_log?work_key=eq.${enc(op.from)}&user_id=eq.${uid}`, { work_key: op.into })
+    const moved = await patch(`dev_log?project=eq.${enc(op.project)}&work_key=eq.${enc(op.from)}&user_id=eq.${uid}`, { work_key: op.into })
     await patch(`dev_work?id=eq.${from.id}&user_id=eq.${uid}`, { hidden: true, updated_at: new Date().toISOString() })
     await patch(`dev_work?id=eq.${into.id}&user_id=eq.${uid}`, { ...mergedWork(into, from), updated_at: new Date().toISOString() })
     return { changed: 1, summary: `데이터 정리: ${op.from}을 ${op.into}에 합침 (기록 ${moved}줄 옮김, ${op.from} 숨김)` }
@@ -151,6 +161,8 @@ export default async function handler(req, res) {
     if (op.error) return res.status(400).json({ error: op.error })
     const result = await runAdmin(op, uid)
     if (result.error) return res.status(result.status ?? 400).json({ error: result.error })
+    // 주식 작업을 정리했으면 요약 앞에 프로젝트를 적는다 (정리 기록 자체는 대시보드 기록이라)
+    if (op.project !== DEFAULT_PROJECT) result.summary = result.summary.replace('데이터 정리: ', `데이터 정리: [${op.project}] `)
 
     // 정리 기록 (실패해도 정리 결과는 그대로 돌려준다). 작업 번호는 붙이지 않는다:
     // 붙이면 작업 정리 탭의 진행 줄 "확인" 단계와 DevOps 거르기에 정리 기록이 섞인다 (작업 번호는 요약에만)

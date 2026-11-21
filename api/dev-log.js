@@ -18,7 +18,7 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 import { ownerUserId } from './_agents/owner.js'
 import { rest } from './_agents/supabase.js'
 import { sendMessage } from './_agents/telegram.js'
-import { WORK_KEY, devWorkFields, mergeWork } from './_lib/devWork.js'
+import { DEFAULT_PROJECT, PROJECTS, WORK_KEY, devWorkFields, mergeWork } from './_lib/devWork.js'
 
 export const MIN_SECRET_LENGTH = 32
 // 역할 (보고서 13에서 검토 review 추가, SQL 20261122000000 필요)
@@ -69,7 +69,9 @@ export function devLogRow(body) {
     if (typeof body.work !== 'string' || !WORK_KEY.test(body.work.trim())) return { error: 'bad-work-key' }
     work_key = body.work.trim()
   }
-  return { row: { agent, kind, status, summary, ref, ...(work_key ? { work_key } : {}) } }
+  // 프로젝트: 없으면 DB 기본값(대시보드)
+  if (body.project != null && !PROJECTS.includes(body.project)) return { error: 'bad-project' }
+  return { row: { agent, kind, status, summary, ref, ...(work_key ? { work_key } : {}), ...(body.project ? { project: body.project } : {}) } }
 }
 
 export const looksSecret = (text) => SECRET_LIKE.test(text)
@@ -77,7 +79,8 @@ export const looksSecret = (text) => SECRET_LIKE.test(text)
 // 작업 단위 저장: 같은 작업 번호가 있으면 합쳐 고치고, 없으면 새로 만든다. 돌려주는 값: 'created' | 'updated' | { error }
 export async function saveWork(fields, user_id, retried = false) {
   const key = encodeURIComponent(fields.work_key)
-  const [existing] = (await rest(`dev_work?select=*&user_id=eq.${user_id}&work_key=eq.${key}`)) ?? []
+  const project = encodeURIComponent(fields.project ?? DEFAULT_PROJECT)
+  const [existing] = (await rest(`dev_work?select=*&user_id=eq.${user_id}&project=eq.${project}&work_key=eq.${key}`)) ?? []
   if (existing) {
     const patch = { ...mergeWork(existing, fields), updated_at: new Date().toISOString() }
     await rest(`dev_work?id=eq.${existing.id}&user_id=eq.${user_id}`, { method: 'PATCH', prefer: 'return=minimal', body: patch })

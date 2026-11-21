@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ChevronDown, ExternalLink } from 'lucide-react'
 import { getRow } from '../lib/db.js'
 import { formatAt } from '../utils/controlTime.js'
-import { areaLabel, changeLines, commitUrl, currentStep, fileTotals, fileUrl, stepLine, workDay } from '../utils/devWork.js'
+import { areaLabel, changeLines, commitUrl, currentStep, fileTotals, fileUrl, projectOf, stepLine, workDay } from '../utils/devWork.js'
 import { KIND_LABEL, STATE_STYLE } from '../utils/teamStatus.js'
 
 const STATUS_STYLE = { 완료: STATE_STYLE.pass, 되돌림: STATE_STYLE.idle, '진행 중': STATE_STYLE.running }
@@ -19,7 +19,7 @@ function Section({ title, children }) {
 
 // 개발 창의 작업 한 줄 (보고서 12 2단계). 누르면 펼쳐서 작업 이유 · 바꾼 내용 · 바뀐 파일(줄 수·GitHub) · 보고서 · 진행 단계를 보여 준다.
 // 파일 목록은 크기 때문에 펼칠 때 따로 불러온다. logs = 이 작업의 한 줄 기록.
-export default function DevWorkItem({ work, logs, defaultOpen = false }) {
+export default function DevWorkItem({ work, logs, showProject = false, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen)
   const [detail, setDetail] = useState({ status: 'idle', files: [] })
   const style = STATUS_STYLE[work.status] ?? STATE_STYLE.info
@@ -40,6 +40,7 @@ export default function DevWorkItem({ work, logs, defaultOpen = false }) {
   }, [open, detail.status, work.id])
 
   const lastCommit = work.commits?.at(-1)
+  const project = projectOf(work)
   const totals = fileTotals(detail.files)
   const changes = changeLines(work.changes)
   const steps = stepLine(logs)
@@ -58,6 +59,7 @@ export default function DevWorkItem({ work, logs, defaultOpen = false }) {
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="text-gray-100">{work.title}</span>
           <span className="flex flex-wrap items-center gap-1.5 text-xs">
+            {showProject && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-sky-800 dark:bg-sky-900/60 dark:text-sky-200">{project}</span>}
             <span className="rounded bg-gray-700 px-1.5 py-0.5 text-gray-200">{work.work_key}</span>
             {(work.areas ?? []).map((area) => (
               <span key={area} className="rounded border border-gray-700 px-1.5 py-0.5 text-gray-400">
@@ -99,7 +101,7 @@ export default function DevWorkItem({ work, logs, defaultOpen = false }) {
             {detail.status === 'ready' && (
               <ul className="flex flex-col gap-0.5 text-xs">
                 {detail.files.map((file) => {
-                  const href = fileUrl(lastCommit, file.path)
+                  const href = fileUrl(lastCommit, file.path, project)
                   return (
                     <li key={file.path} className="flex min-w-0 gap-2">
                       {href ? (
@@ -120,8 +122,8 @@ export default function DevWorkItem({ work, logs, defaultOpen = false }) {
             {(work.commits ?? []).length > 0 && (
               <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
                 {work.commits.map((hash) =>
-                  commitUrl(hash) ? (
-                    <a key={hash} href={commitUrl(hash)} target="_blank" rel="noreferrer" className={linkClass}>
+                  commitUrl(hash, project) ? (
+                    <a key={hash} href={commitUrl(hash, project)} target="_blank" rel="noreferrer" className={linkClass}>
                       GitHub에서 코드 보기 ({hash}) <ExternalLink className="h-3 w-3" aria-hidden="true" />
                     </a>
                   ) : (

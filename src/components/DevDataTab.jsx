@@ -4,7 +4,7 @@ import Skeleton from './Skeleton.jsx'
 import { devDataCounts, listDevLogsAdmin, listDevWorksAdmin } from '../lib/db.js'
 import { runDevAdmin } from '../lib/devAdmin.js'
 import { formatAt, kstDate } from '../utils/controlTime.js'
-import { ADMIN_ERROR, DATA_PERIODS, areaLabel, dataRange, toCsv } from '../utils/devWork.js'
+import { ADMIN_ERROR, DATA_PERIODS, PROJECT_FILTERS, areaLabel, dataRange, projectOf, toCsv } from '../utils/devWork.js'
 import { KIND_LABEL, STATE_LABEL, TEAM, TEAM_NAME } from '../utils/teamStatus.js'
 
 const PAGE = 100
@@ -19,6 +19,7 @@ const chip = (active) =>
 
 const LOG_COLUMNS = [
   { key: 'created_at', label: '시각' },
+  { key: 'project', label: '프로젝트' },
   { key: 'agent', label: '역할' },
   { key: 'kind', label: '종류' },
   { key: 'status', label: '결과' },
@@ -27,6 +28,7 @@ const LOG_COLUMNS = [
   { key: 'ref', label: '커밋·주소' },
 ]
 const WORK_COLUMNS = [
+  { key: 'project', label: '프로젝트' },
   { key: 'work_key', label: '작업 번호' },
   { key: 'started_at', label: '시작' },
   { key: 'finished_at', label: '끝' },
@@ -89,6 +91,7 @@ export default function DevDataTab() {
 
   return (
     <div className="flex flex-col gap-4">
+      <p className="-mb-2 text-xs text-gray-500">대시보드·주식 모든 프로젝트를 합친 숫자예요</p>
       <section aria-label="현황" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {stats.map((stat) => (
           <div key={stat.label} className="rounded-xl border border-gray-700 bg-gray-800 px-3 py-2.5">
@@ -132,6 +135,19 @@ function usePaged(load, key) {
   }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
   const next = (offset) => setPage((prev) => ({ ...prev, offset, n: prev.n + 1 }))
   return { ...state, loadMore: () => next(state.rows.length), retry: () => next(page.offset) }
+}
+
+// 프로젝트 고르기 (전체·대시보드·주식, 보고서 13)
+function ProjectSelect({ value, onChange }) {
+  return (
+    <select aria-label="프로젝트" value={value} onChange={(event) => onChange(event.target.value)} className={fieldClass}>
+      {PROJECT_FILTERS.map((item) => (
+        <option key={item.id} value={item.value ?? ''}>
+          {item.id === 'all' ? '프로젝트 전체' : item.name}
+        </option>
+      ))}
+    </select>
+  )
 }
 
 function Filters({ children, onCsv, disabled }) {
@@ -188,6 +204,7 @@ function ListState({ data, empty, children }) {
 }
 
 function LogTable({ today, version, onChanged }) {
+  const [project, setProject] = useState('')
   const [period, setPeriod] = useState('month')
   const [agent, setAgent] = useState('')
   const [kind, setKind] = useState('')
@@ -198,11 +215,14 @@ function LogTable({ today, version, onChanged }) {
   const [target, setTarget] = useState('')
   const [busy, setBusy] = useState(false)
   const data = usePaged(
-    (offset) => listDevLogsAdmin({ ...dataRange(period, today), agent, kind, status, unassigned, hidden, offset, limit: PAGE }),
-    JSON.stringify([period, agent, kind, status, unassigned, hidden, version, today]),
+    (offset) => listDevLogsAdmin({ ...dataRange(period, today), project, agent, kind, status, unassigned, hidden, offset, limit: PAGE }),
+    JSON.stringify([project, period, agent, kind, status, unassigned, hidden, version, today]),
   )
 
-  useEffect(() => setSelected(new Set()), [period, agent, kind, status, unassigned, hidden, version])
+  useEffect(() => {
+    setSelected(new Set())
+    setTargetProject('')
+  }, [project, period, agent, kind, status, unassigned, hidden, version])
   const toggle = (id) =>
     setSelected((prev) => {
       const next = new Set(prev)
@@ -210,6 +230,15 @@ function LogTable({ today, version, onChanged }) {
       return next
     })
   const ids = [...selected]
+  // 고른 기록을 모두 풀면 넣을 프로젝트 고르기도 처음으로
+  useEffect(() => {
+    if (selected.size === 0) setTargetProject('')
+  }, [selected])
+  // 고른 기록의 프로젝트. 두 프로젝트가 섞이면 작업에 넣기를 막는다 (작업 번호는 프로젝트마다 따로)
+  const pickedProjects = [...new Set(data.rows.filter((row) => selected.has(row.id)).map(projectOf))]
+  // 넣을 작업의 프로젝트: 기본은 고른 기록의 프로젝트. 잘못 단 기록을 다른 프로젝트 작업에 옮길 때는 바꿔 고른다
+  const [targetProject, setTargetProject] = useState('')
+  const intoProject = targetProject || (pickedProjects.length === 1 ? pickedProjects[0] : '')
   const run = async (body, done) => {
     if (ids.length > MAX_PICK) return
     setBusy(true)
@@ -220,6 +249,7 @@ function LogTable({ today, version, onChanged }) {
   return (
     <section aria-label="단계별 기록" className="flex flex-col gap-3">
       <Filters onCsv={() => download(`개발기록-${today}.csv`, toCsv(LOG_COLUMNS, data.rows))} disabled={data.rows.length === 0}>
+        <ProjectSelect value={project} onChange={setProject} />
         <select aria-label="기간" value={period} onChange={(event) => setPeriod(event.target.value)} className={fieldClass}>
           {DATA_PERIODS.map((item) => (
             <option key={item.id} value={item.id}>
@@ -263,8 +293,17 @@ function LogTable({ today, version, onChanged }) {
         <div className="sticky -top-4 z-10 flex shadow-lg flex-wrap items-center gap-2 rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-xs">
           <span className="font-semibold text-white">{ids.length}줄 고름</span>
           {ids.length > MAX_PICK && <span className="text-amber-700 dark:text-amber-400">한 번에 {MAX_PICK}줄까지 정리할 수 있어요</span>}
+          {pickedProjects.length > 1 && !targetProject && <span className="text-amber-700 dark:text-amber-400">대시보드와 주식 기록이 섞였어요. 넣을 프로젝트를 골라 주세요</span>}
+          <select aria-label="넣을 작업의 프로젝트" value={intoProject} onChange={(event) => setTargetProject(event.target.value)} className={fieldClass}>
+            <option value="">프로젝트 고르기</option>
+            {PROJECT_FILTERS.filter((item) => item.value).map((item) => (
+              <option key={item.id} value={item.value}>
+                {item.name}
+              </option>
+            ))}
+          </select>
           <input aria-label="넣을 작업 번호" value={target} onChange={(event) => setTarget(event.target.value.trim())} placeholder={KEY_HINT} className={`${fieldClass} w-44`} />
-          <button type="button" disabled={busy || !target || ids.length > MAX_PICK} onClick={() => run({ action: 'assign', log_ids: ids, work_key: target }, (n) => `${n}줄을 ${target}에 넣었어요`)} className={buttonClass}>
+          <button type="button" disabled={busy || !target || !intoProject || ids.length > MAX_PICK} onClick={() => run({ action: 'assign', log_ids: ids, work_key: target, project: intoProject }, (n) => `${n}줄을 ${target}에 넣었어요`)} className={buttonClass}>
             작업에 넣기
           </button>
           <button type="button" disabled={busy || ids.length > MAX_PICK} onClick={() => run({ action: 'unassign', log_ids: ids }, (n) => `${n}줄을 작업에서 뺐어요`)} className={buttonClass}>
@@ -294,6 +333,7 @@ function LogTable({ today, version, onChanged }) {
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="text-gray-100 [overflow-wrap:anywhere]">{row.summary}</span>
                   <span className="text-gray-400">
+                    {projectOf(row) !== '대시보드' ? `${projectOf(row)} · ` : ''}
                     {TEAM_NAME[row.agent] ?? row.agent} · {KIND_LABEL[row.kind] ?? row.kind} · {STATE_LABEL[row.status] ?? row.status}
                     {row.ref ? ` · ${row.ref.slice(0, 12)}` : ''}
                   </span>
@@ -309,6 +349,7 @@ function LogTable({ today, version, onChanged }) {
 }
 
 function WorkTable({ today, version, onChanged }) {
+  const [project, setProject] = useState('')
   const [period, setPeriod] = useState('year')
   const [area, setArea] = useState('')
   const [status, setStatus] = useState('')
@@ -316,8 +357,8 @@ function WorkTable({ today, version, onChanged }) {
   const [hidden, setHidden] = useState(false)
   const [editing, setEditing] = useState(null)
   const data = usePaged(
-    (offset) => listDevWorksAdmin({ ...dataRange(period, today), area, status, noReason, hidden, offset, limit: PAGE }),
-    JSON.stringify([period, area, status, noReason, hidden, version, today]),
+    (offset) => listDevWorksAdmin({ ...dataRange(period, today), project, area, status, noReason, hidden, offset, limit: PAGE }),
+    JSON.stringify([project, period, area, status, noReason, hidden, version, today]),
   )
   // 숨긴 것 보기를 바꾸거나 새로 읽으면 열려 있던 고치기 칸을 닫는다
   useEffect(() => setEditing(null), [hidden, version])
@@ -325,6 +366,7 @@ function WorkTable({ today, version, onChanged }) {
   return (
     <section aria-label="작업 목록" className="flex flex-col gap-3">
       <Filters onCsv={() => download(`개발작업-${today}.csv`, toCsv(WORK_COLUMNS, data.rows))} disabled={data.rows.length === 0}>
+        <ProjectSelect value={project} onChange={setProject} />
         <select aria-label="기간" value={period} onChange={(event) => setPeriod(event.target.value)} className={fieldClass}>
           {DATA_PERIODS.map((item) => (
             <option key={item.id} value={item.id}>
@@ -359,6 +401,7 @@ function WorkTable({ today, version, onChanged }) {
           {data.rows.map((work) => (
             <li key={work.id} className="flex flex-col gap-2 border-b border-gray-700 px-3 py-2.5 text-xs last:border-b-0">
               <div className="flex flex-wrap items-start gap-2">
+                {projectOf(work) !== '대시보드' && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-sky-800 dark:bg-sky-900/60 dark:text-sky-200">{projectOf(work)}</span>}
                 <span className="rounded bg-gray-700 px-1.5 py-0.5 text-gray-200">{work.work_key}</span>
                 <span className="min-w-0 flex-1 text-sm text-gray-100">{work.title}</span>
                 <span className="text-gray-400 tabular-nums">
@@ -390,7 +433,7 @@ function WorkActions({ work, hidden, onEdit, onChanged }) {
   }
   const merge = () => {
     const into = window.prompt(`${work.work_key}을 어느 작업에 합칠까요? 작업 번호를 적어 주세요 (${KEY_HINT}).\n커밋·파일·기록이 옮겨지고 ${work.work_key}은 숨겨져요.`)?.trim()
-    if (into) run({ action: 'merge', from: work.work_key, into }, () => `${work.work_key}을 ${into}에 합쳤어요`)
+    if (into) run({ action: 'merge', from: work.work_key, into, project: projectOf(work) }, () => `${work.work_key}을 ${into}에 합쳤어요`)
   }
   return (
     <div className="flex flex-wrap gap-2">
@@ -407,7 +450,7 @@ function WorkActions({ work, hidden, onEdit, onChanged }) {
       <button
         type="button"
         disabled={busy}
-        onClick={() => (hidden || window.confirm(`${work.work_key}을 숨길까요? "숨긴 것 보기"에서 되살릴 수 있어요.`)) && run({ action: 'hide', target: 'work', ids: [work.id], hidden: !hidden }, () => `${work.work_key}을 ${hidden ? '되살렸어요' : '숨겼어요'}`)}
+        onClick={() => (hidden || window.confirm(`${work.work_key}을 숨길까요? "숨긴 것 보기"에서 되살릴 수 있어요.`)) && run({ action: 'hide', target: 'work', ids: [work.id], hidden: !hidden, project: projectOf(work) }, () => `${work.work_key}을 ${hidden ? '되살렸어요' : '숨겼어요'}`)}
         className={buttonClass}
       >
         {hidden ? '되살리기' : '숨기기'}
@@ -442,7 +485,7 @@ function WorkEditor({ work, onDone, onChanged }) {
     event.preventDefault()
     if (!changed) return onDone()
     setBusy(true)
-    const ok = await act({ action: 'edit', work_key: work.work_key, fields }, () => `${work.work_key}을 고쳤어요`, onChanged)
+    const ok = await act({ action: 'edit', work_key: work.work_key, project: projectOf(work), fields }, () => `${work.work_key}을 고쳤어요`, onChanged)
     setBusy(false)
     if (ok) onDone()
   }

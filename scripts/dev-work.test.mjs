@@ -2,14 +2,15 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { splitWorkArg } from './dev-log.mjs'
 import { execFileSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { parseOptions } from './dev-work.mjs'
 import { devWorkFields } from '../api/_lib/devWork.js'
 import { looksSecret } from '../api/dev-log.js'
-import { areasFor, commitBody, groupCommits, kstDay, parseCommitMessage, parseGitLog, parseNumstat, reportKey } from './dev-work-lib.mjs'
+import { areasFor, attachChangelog, checkProjectRepo, commitBody, groupCommits, koreanTitle, parseChangelog, kstDay, parseCommitMessage, parseGitLog, parseNumstat, reportKey } from './dev-work-lib.mjs'
 
 test('--work 인자: 어디에 있어도 빼내고 나머지 순서는 그대로', () => {
-  assert.deepEqual(splitWorkArg(['lead', 'edit', 'pass', '요약', '--work', '보고서12-1', 'abc1234']), { rest: ['lead', 'edit', 'pass', '요약', 'abc1234'], work: '보고서12-1' })
-  assert.deepEqual(splitWorkArg(['lead', 'edit']), { rest: ['lead', 'edit'], work: null })
+  assert.deepEqual(splitWorkArg(['lead', 'edit', 'pass', '요약', '--work', '보고서12-1', 'abc1234']), { rest: ['lead', 'edit', 'pass', '요약', 'abc1234'], work: '보고서12-1', project: null })
+  assert.deepEqual(splitWorkArg(['lead', 'edit', '--project', '주식']), { rest: ['lead', 'edit'], work: null, project: '주식' })
   assert.deepEqual(parseOptions(['start', '보고서12-1', '제목', '--reason', '왜', '--report', 'https://claude.ai/x']), {
     rest: ['start', '보고서12-1', '제목'],
     options: { reason: '왜', report: 'https://claude.ai/x' },
@@ -115,4 +116,69 @@ test('이 저장소의 지난 커밋 전부가 서버 검사를 통과한다 (�
     const result = devWorkFields(request, looksSecret)
     assert.equal(result.error, undefined, `${request.work_key} ${request.commits[0]}: ${result.error}`)
   }
+})
+
+test('제목 머리글 한글로 (보고서 13)', () => {
+  assert.equal(koreanTitle('feat: 시장 거래 창'), '기능: 시장 거래 창')
+  assert.equal(koreanTitle('fix(ui): 버튼'), '수정: 버튼')
+  assert.equal(koreanTitle('refactor+fix: 코드 정리'), '다듬기·수정: 코드 정리')
+  assert.equal(koreanTitle('Initial commit: 처음'), 'Initial commit: 처음', '모르는 머리글은 그대로')
+  assert.equal(koreanTitle('홈 오늘 칸 (보고서 11 1단계)'), '홈 오늘 칸 (보고서 11 1단계)')
+})
+
+test('주식 사이트 분야: 파일 모양으로', () => {
+  assert.deepEqual(areasFor(['templates/index.html', 'static/js/app.js', 'app.py', 'screener_api.py', 'api/keys.py', 'data_fetcher.py', 'data/x.json', 'pe_eps_cache.json', 'scripts/team_up.py', 'docs/CHANGELOG.md', 'requirements.txt'], '', '주식'), ['화면', '에이전트', '데이터', '개발도구', '문서', '설정'])
+})
+
+test('변경 기록 읽기와 짝짓기: 해시 칸, 같은 날 낱말 겹침, 짝 없으면 그대로', () => {
+  const text = ['## 2026-11', '- 11-21 | 버그 | **시간외 등락 기준** 수정 | (이번 커밋)', '- 11-21 | 데이터 | 거래대금 과거치 불러오기 | (이번 커밋)', '- 11-20 | 기능 | 해시로 이어진 줄 | abcdef1', '- 11-20 | 기능 | 같은 커밋 둘째 줄 | 1234567, abcdef1', '- 11-19 | 환경 | 짝 없는 줄 | (이번 커밋)', '## 2026-10', '- 10-30~31 | 문서 | 날짜 범위 | -', '- 이상한 줄'].join('\n')
+  const entries = parseChangelog(text)
+  assert.deepEqual(entries.map((e) => [e.day, e.kind, e.commits]), [['20261121', '버그', []], ['20261121', '데이터', []], ['20261120', '기능', ['abcdef1']], ['20261120', '기능', ['1234567', 'abcdef1']], ['20261119', '환경', []], ['20261030', '문서', []]])
+  assert.equal(entries.skipped, 0, '"- 이상한 줄"은 날짜로 시작하지 않아 기록 줄이 아니다')
+  assert.equal(entries[0].content, '시간외 등락 기준 수정')
+  const log = [
+    ['abcdef1' + '0'.repeat(33), '2026-11-20T10:00:00+09:00', 'feat: 아무 제목'],
+    ['b'.repeat(40), '2026-11-21T09:00:00+09:00', 'feat: 국내 거래대금 과거치 불러오기'],
+    ['c'.repeat(40), '2026-11-21T10:00:00+09:00', 'fix: 시간외 등락 기준 통일'],
+  ].map(([hash, at, message]) => `\x1e${hash}\x1f${at}\x1f${message}\n\n- 커밋 본문 줄\x1d\n1\t0\tapp.py\n`).join('')
+  const groups = groupCommits(parseGitLog(log), { project: '주식' })
+  assert.equal(groups[0].requests[0].project, '주식')
+  assert.equal(groups[1].requests[0].title, '기능: 국내 거래대금 과거치 불러오기')
+  const result = attachChangelog(groups, entries)
+  assert.equal(result.paired, 4)
+  assert.deepEqual(result.unpaired.map((e) => e.kind), ['환경', '문서'])
+  assert.equal(groups[0].requests[0].changes, '- [기능] 해시로 이어진 줄\n- [기능] 같은 커밋 둘째 줄\n- 커밋 본문 줄', '해시 짝은 여러 줄, 커밋 본문 줄은 뒤에 남는다')
+  // 해시 2~3개 줄은 그 커밋들의 작업 모두에, 4개 이상(요약 줄)은 첫 작업에만
+  const two = groupCommits(parseGitLog(log), { project: '주식' })
+  attachChangelog(two, parseChangelog(['## 2026-11', `- 11-21 | 기능 | 두 커밋 줄 | ${'b'.repeat(7)}, ${'c'.repeat(7)}`].join('\n')))
+  assert.deepEqual(two.map((group) => Boolean(group.requests[0].paired)), [false, true, true])
+  const many = groupCommits(parseGitLog(log), { project: '주식' })
+  attachChangelog(many, parseChangelog(['## 2026-11', `- 11-21 | 요약 | 여러 단계 | abcdef1, ${'b'.repeat(7)}, ${'c'.repeat(7)}, 1111111`].join('\n')))
+  assert.deepEqual(many.map((group) => Boolean(group.requests[0].paired)), [true, false, false])
+  assert.equal(groups[1].requests[0].changes, '- [데이터] 거래대금 과거치 불러오기\n- 커밋 본문 줄')
+  assert.equal(groups[2].requests[0].changes, '- [버그] 시간외 등락 기준 수정\n- 커밋 본문 줄')
+  assert.equal(groups[2].requests[0].paired, true)
+})
+
+test('주식 사이트 커밋 전부가 서버 검사를 통과한다 (저장소가 있을 때만)', { skip: !existsSync('/root/stockview/.git') }, () => {
+  const log = execFileSync('git', ['-C', '/root/stockview', '-c', 'core.quotepath=off', 'log', '--reverse', '--no-merges', '--numstat', '--format=%x1e%H%x1f%aI%x1f%B%x1d'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  const requests = groupCommits(parseGitLog(log), { project: '주식' }).flatMap((group) => group.requests)
+  assert.ok(requests.length > 100)
+  for (const request of requests) {
+    const result = devWorkFields(request, looksSecret)
+    assert.equal(result.error, undefined, `${request.work_key} ${request.commits[0]}: ${result.error}`)
+    assert.equal(result.fields.project, '주식')
+  }
+})
+
+test('프로젝트·저장소 확인: 엉뚱한 저장소의 커밋이 다른 프로젝트로 들어가지 않게', () => {
+  const dash = 'https://github.com/leejongsoo91-create/LEE0011.git'
+  const stock = 'https://github.com/leejongsoo91-create/stockview.git'
+  assert.equal(checkProjectRepo('대시보드', undefined, dash), null)
+  assert.equal(checkProjectRepo('주식', '/root/stockview', stock), null)
+  assert.match(checkProjectRepo('주식', undefined, dash), /--repo/)
+  assert.match(checkProjectRepo('대시보드', '/root/stockview', stock, { projectGiven: false }), /--project/)
+  assert.match(checkProjectRepo('주식', '/root/stockview', dash), /저장소가 주식/)
+  assert.match(checkProjectRepo('대시보드', undefined, stock), /저장소가 대시보드/)
+  assert.match(checkProjectRepo('finviz', undefined, dash), /모르는 프로젝트/)
 })

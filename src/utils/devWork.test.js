@@ -123,3 +123,20 @@ test('역할 고르기에 검토, 분야 표시 이름', async () => {
   assert.equal(areaLabel('에이전트'), '서버·에이전트')
   assert.equal(areaLabel('화면'), '화면')
 })
+
+test('프로젝트: 주소 값, 기록 잇기 열쇠, 저장소별 링크 (보고서 13)', async () => {
+  const { parseProject, projectValue, workKeyOf, commitUrl: url, fileUrl: file } = await import('./devWork.js')
+  assert.equal(parseProject('stock'), 'stock')
+  assert.equal(parseProject('주식'), 'all')
+  assert.equal(projectValue('stock'), '주식')
+  assert.equal(projectValue('all'), null)
+  assert.equal(workKeyOf({ work_key: '수정-20261120-1' }), '대시보드|수정-20261120-1')
+  assert.equal(workKeyOf({ work_key: '수정-20261120-1', project: '주식' }), '주식|수정-20261120-1')
+  assert.equal(url('3a8c586', '주식'), 'https://github.com/leejongsoo91-create/stockview/commit/3a8c586')
+  assert.equal(file('3a8c586', 'app.py', '주식'), 'https://github.com/leejongsoo91-create/stockview/blob/3a8c586/app.py')
+  assert.equal(url('3a8c586', '없는 곳'), null)
+  // 두 프로젝트의 같은 작업 번호 기록은 섞이지 않는다
+  const works = [{ work_key: 'k', project: '대시보드' }, { work_key: 'k', project: '주식' }]
+  const logs = [{ agent: 'qa', work_key: 'k', project: '주식' }]
+  assert.deepEqual(filterByAgent(works, logs, 'qa'), [works[1]])
+})

@@ -1,10 +1,14 @@
-// 업무 탭 "개발 팀" 현황판의 계산. 기록(dev_log 행)만 보고 정하며, 화면·네트워크와 상관없는 순수 함수다.
+// 중앙관제 "개발 팀" 현황판의 계산. 기록(dev_log 행)만 보고 정하며, 화면·네트워크와 상관없는 순수 함수다.
 
+// 역할 4개 (보고서 13). id는 DB에 저장되는 값이라 그대로 두고, 화면에는 한글 이름만 보인다.
+//   개발 = 메인 세션, 검토 = 독립 검토 에이전트, 테스트 = QA 세션, 운영 = SQL 확인·기록 정리·서버 감시
 export const TEAM = [
-  { id: 'lead', name: 'Lead Coder', role: '구현 · 커밋' },
-  { id: 'qa', name: 'QA/Reviewer', role: '검토 · 테스트' },
-  { id: 'devops', name: 'DevOps/Monitor', role: '빌드 · 배포 확인' },
+  { id: 'lead', name: '개발', role: '계획 · 코드 · 커밋' },
+  { id: 'review', name: '검토', role: '코드 검토 · 재검토' },
+  { id: 'qa', name: '테스트', role: '테스트 · 빌드 · 화면 확인' },
+  { id: 'devops', name: '운영', role: '배포 · DB · 기록 정리' },
 ]
+export const TEAM_NAME = Object.fromEntries(TEAM.map((member) => [member.id, member.name]))
 
 export const KIND_LABEL = { plan: '계획', edit: '수정', test: '테스트', review: '검토', commit: '커밋', deploy: '배포', check: '확인' }
 

@@ -115,3 +115,11 @@ test('데이터 관리 기간과 CSV: 수식 막기, 따옴표, 배열', async (
   assert.equal(csvCell(null), '""')
   assert.equal(toCsv([{ key: 'a', label: '가' }], [{ a: 1 }]), '﻿"가"\r\n"1"\r\n')
 })
+
+test('역할 고르기에 검토, 분야 표시 이름', async () => {
+  const { AGENT_FILTERS, areaLabel } = await import('./devWork.js')
+  assert.deepEqual(AGENT_FILTERS.map((item) => item.name), ['전체', '개발', '검토', '테스트', '운영'])
+  assert.equal(parseAgent('review'), 'review')
+  assert.equal(areaLabel('에이전트'), '서버·에이전트')
+  assert.equal(areaLabel('화면'), '화면')
+})

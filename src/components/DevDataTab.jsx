@@ -4,12 +4,12 @@ import Skeleton from './Skeleton.jsx'
 import { devDataCounts, listDevLogsAdmin, listDevWorksAdmin } from '../lib/db.js'
 import { runDevAdmin } from '../lib/devAdmin.js'
 import { formatAt, kstDate } from '../utils/controlTime.js'
-import { ADMIN_ERROR, DATA_PERIODS, dataRange, toCsv } from '../utils/devWork.js'
-import { KIND_LABEL, STATE_LABEL, TEAM } from '../utils/teamStatus.js'
+import { ADMIN_ERROR, DATA_PERIODS, areaLabel, dataRange, toCsv } from '../utils/devWork.js'
+import { KIND_LABEL, STATE_LABEL, TEAM, TEAM_NAME } from '../utils/teamStatus.js'
 
 const PAGE = 100
 const MAX_PICK = 200 // 서버가 한 번에 받는 기록 수 (api/dev-admin.js MAX_IDS)
-const AREAS = ['화면', '에이전트', 'DB', '보안', '개발도구', '문서', '설정']
+const AREAS = ['화면', '에이전트', 'DB', '보안', '개발도구', '문서', '설정', '데이터']
 const STATUSES = ['진행 중', '완료', '되돌림']
 const KEY_HINT = '보고서12-3 또는 수정-20261120-1'
 const fieldClass = 'rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-xs text-gray-100 outline-none focus:border-gray-500'
@@ -19,7 +19,7 @@ const chip = (active) =>
 
 const LOG_COLUMNS = [
   { key: 'created_at', label: '시각' },
-  { key: 'agent', label: '에이전트' },
+  { key: 'agent', label: '역할' },
   { key: 'kind', label: '종류' },
   { key: 'status', label: '결과' },
   { key: 'work_key', label: '작업 번호' },
@@ -33,8 +33,8 @@ const WORK_COLUMNS = [
   { key: 'status', label: '상태' },
   { key: 'areas', label: '분야' },
   { key: 'title', label: '제목' },
-  { key: 'reason', label: '왜' },
-  { key: 'changes', label: '무엇을' },
+  { key: 'reason', label: '작업 이유' },
+  { key: 'changes', label: '바꾼 내용' },
   { key: 'commits', label: '커밋' },
   { key: 'report_url', label: '보고서' },
 ]
@@ -59,9 +59,9 @@ async function act(body, done, onChanged) {
   }
 }
 
-// 개발 창 "데이터 관리" 탭 (보고서 12 3단계): 원본 기록(dev_log)과 작업(dev_work)을 표로 보고 정리한다.
-// 정리(묶기·풀기·고치기·합치기·숨기기)는 /api/dev-admin이 주인 확인 뒤 하고, 정리할 때마다 한 줄 기록을 남긴다.
-// 지우기는 없다. 숨긴 것은 "숨긴 것 보기"에서 되살린다. 거른 표는 CSV로 내려받는다.
+// 개발 창 "기록 정리" 탭 (보고서 12 3단계, 이름은 보고서 13): 단계별 기록(dev_log)과 작업 목록(dev_work)을 표로 보고 정리한다.
+// 정리(작업에 넣기·빼기·고치기·합치기·숨기기)는 /api/dev-admin이 주인 확인 뒤 하고, 정리할 때마다 한 줄 기록을 남긴다.
+// 지우기는 없다. 숨긴 것은 "숨긴 것 보기"에서 되살린다. 거른 표는 엑셀에서 열리는 CSV 파일로 받는다.
 export default function DevDataTab() {
   const today = kstDate()
   const [view, setView] = useState('logs')
@@ -81,8 +81,8 @@ export default function DevDataTab() {
 
   const oldest = counts?.oldest ? kstDate(new Date(counts.oldest)) : null
   const stats = [
-    { label: '한 줄 기록', value: counts?.logs },
-    { label: '작업에 안 묶인 기록', value: counts?.unassigned },
+    { label: '단계 기록', value: counts?.logs },
+    { label: '작업 번호 없는 기록', value: counts?.unassigned },
     { label: '작업', value: counts?.works },
     { label: '가장 오래된 기록', value: oldest, sub: oldest ? `${Number(oldest.slice(0, 4)) + 5}${oldest.slice(4)} 지워짐(5년)` : '' },
   ]
@@ -100,10 +100,10 @@ export default function DevDataTab() {
       </section>
       <div className="flex gap-1.5" role="group" aria-label="볼 표">
         <button type="button" aria-pressed={view === 'logs'} onClick={() => setView('logs')} className={chip(view === 'logs')}>
-          원본 기록
+          단계별 기록
         </button>
         <button type="button" aria-pressed={view === 'works'} onClick={() => setView('works')} className={chip(view === 'works')}>
-          작업
+          작업 목록
         </button>
       </div>
       {view === 'logs' ? <LogTable today={today} version={version} onChanged={reload} /> : <WorkTable today={today} version={version} onChanged={reload} />}
@@ -139,7 +139,7 @@ function Filters({ children, onCsv, disabled }) {
     <div className="flex flex-wrap items-center gap-2 text-xs">
       {children}
       <button type="button" onClick={onCsv} disabled={disabled} className={`${buttonClass} ml-auto`}>
-        CSV 내려받기
+        엑셀 파일로 받기
       </button>
     </div>
   )
@@ -218,7 +218,7 @@ function LogTable({ today, version, onChanged }) {
   }
 
   return (
-    <section aria-label="원본 기록" className="flex flex-col gap-3">
+    <section aria-label="단계별 기록" className="flex flex-col gap-3">
       <Filters onCsv={() => download(`개발기록-${today}.csv`, toCsv(LOG_COLUMNS, data.rows))} disabled={data.rows.length === 0}>
         <select aria-label="기간" value={period} onChange={(event) => setPeriod(event.target.value)} className={fieldClass}>
           {DATA_PERIODS.map((item) => (
@@ -227,8 +227,8 @@ function LogTable({ today, version, onChanged }) {
             </option>
           ))}
         </select>
-        <select aria-label="에이전트" value={agent} onChange={(event) => setAgent(event.target.value)} className={fieldClass}>
-          <option value="">에이전트 전체</option>
+        <select aria-label="역할" value={agent} onChange={(event) => setAgent(event.target.value)} className={fieldClass}>
+          <option value="">역할 전체</option>
           {TEAM.map((member) => (
             <option key={member.id} value={member.id}>
               {member.name}
@@ -252,7 +252,7 @@ function LogTable({ today, version, onChanged }) {
           ))}
         </select>
         <label className="flex items-center gap-1 text-gray-300">
-          <input type="checkbox" checked={unassigned} onChange={(event) => setUnassigned(event.target.checked)} /> 안 묶인 것만
+          <input type="checkbox" checked={unassigned} onChange={(event) => setUnassigned(event.target.checked)} /> 작업 번호 없는 것만
         </label>
         <label className="flex items-center gap-1 text-gray-300">
           <input type="checkbox" checked={hidden} onChange={(event) => setHidden(event.target.checked)} /> 숨긴 것 보기
@@ -263,12 +263,12 @@ function LogTable({ today, version, onChanged }) {
         <div className="sticky -top-4 z-10 flex shadow-lg flex-wrap items-center gap-2 rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-xs">
           <span className="font-semibold text-white">{ids.length}줄 고름</span>
           {ids.length > MAX_PICK && <span className="text-amber-700 dark:text-amber-400">한 번에 {MAX_PICK}줄까지 정리할 수 있어요</span>}
-          <input aria-label="묶을 작업 번호" value={target} onChange={(event) => setTarget(event.target.value.trim())} placeholder={KEY_HINT} className={`${fieldClass} w-44`} />
-          <button type="button" disabled={busy || !target || ids.length > MAX_PICK} onClick={() => run({ action: 'assign', log_ids: ids, work_key: target }, (n) => `${n}줄을 ${target}에 묶었어요`)} className={buttonClass}>
-            작업에 묶기
+          <input aria-label="넣을 작업 번호" value={target} onChange={(event) => setTarget(event.target.value.trim())} placeholder={KEY_HINT} className={`${fieldClass} w-44`} />
+          <button type="button" disabled={busy || !target || ids.length > MAX_PICK} onClick={() => run({ action: 'assign', log_ids: ids, work_key: target }, (n) => `${n}줄을 ${target}에 넣었어요`)} className={buttonClass}>
+            작업에 넣기
           </button>
-          <button type="button" disabled={busy || ids.length > MAX_PICK} onClick={() => run({ action: 'unassign', log_ids: ids }, (n) => `${n}줄의 묶음을 풀었어요`)} className={buttonClass}>
-            묶음 풀기
+          <button type="button" disabled={busy || ids.length > MAX_PICK} onClick={() => run({ action: 'unassign', log_ids: ids }, (n) => `${n}줄을 작업에서 뺐어요`)} className={buttonClass}>
+            작업에서 빼기
           </button>
           <button
             type="button"
@@ -294,11 +294,11 @@ function LogTable({ today, version, onChanged }) {
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="text-gray-100 [overflow-wrap:anywhere]">{row.summary}</span>
                   <span className="text-gray-400">
-                    {TEAM.find((member) => member.id === row.agent)?.name.split('/')[0] ?? row.agent} · {KIND_LABEL[row.kind] ?? row.kind} · {STATE_LABEL[row.status] ?? row.status}
+                    {TEAM_NAME[row.agent] ?? row.agent} · {KIND_LABEL[row.kind] ?? row.kind} · {STATE_LABEL[row.status] ?? row.status}
                     {row.ref ? ` · ${row.ref.slice(0, 12)}` : ''}
                   </span>
                 </span>
-                <span className={`shrink-0 rounded px-1.5 py-0.5 ${row.work_key ? 'bg-gray-700 text-gray-200' : 'border border-dashed border-gray-600 text-gray-500'}`}>{row.work_key ?? '안 묶임'}</span>
+                <span className={`shrink-0 rounded px-1.5 py-0.5 ${row.work_key ? 'bg-gray-700 text-gray-200' : 'border border-dashed border-gray-600 text-gray-500'}`}>{row.work_key ?? '작업 번호 없음'}</span>
               </label>
             </li>
           ))}
@@ -323,7 +323,7 @@ function WorkTable({ today, version, onChanged }) {
   useEffect(() => setEditing(null), [hidden, version])
 
   return (
-    <section aria-label="작업" className="flex flex-col gap-3">
+    <section aria-label="작업 목록" className="flex flex-col gap-3">
       <Filters onCsv={() => download(`개발작업-${today}.csv`, toCsv(WORK_COLUMNS, data.rows))} disabled={data.rows.length === 0}>
         <select aria-label="기간" value={period} onChange={(event) => setPeriod(event.target.value)} className={fieldClass}>
           {DATA_PERIODS.map((item) => (
@@ -335,7 +335,9 @@ function WorkTable({ today, version, onChanged }) {
         <select aria-label="분야" value={area} onChange={(event) => setArea(event.target.value)} className={fieldClass}>
           <option value="">분야 전체</option>
           {AREAS.map((name) => (
-            <option key={name}>{name}</option>
+            <option key={name} value={name}>
+              {areaLabel(name)}
+            </option>
           ))}
         </select>
         <select aria-label="상태" value={status} onChange={(event) => setStatus(event.target.value)} className={fieldClass}>
@@ -345,7 +347,7 @@ function WorkTable({ today, version, onChanged }) {
           ))}
         </select>
         <label className="flex items-center gap-1 text-gray-300">
-          <input type="checkbox" checked={noReason} onChange={(event) => setNoReason(event.target.checked)} /> 이유 없는 것만
+          <input type="checkbox" checked={noReason} onChange={(event) => setNoReason(event.target.checked)} /> 작업 이유 없는 것만
         </label>
         <label className="flex items-center gap-1 text-gray-300">
           <input type="checkbox" checked={hidden} onChange={(event) => setHidden(event.target.checked)} /> 숨긴 것 보기
@@ -364,7 +366,7 @@ function WorkTable({ today, version, onChanged }) {
                 </span>
               </div>
               <p className="text-gray-400">
-                {(work.areas ?? []).join('·') || '분야 없음'} · 커밋 {(work.commits ?? []).length} · {work.reason ? '이유 있음' : <span className="text-amber-700 dark:text-amber-400">이유 없음</span>}
+                {(work.areas ?? []).map(areaLabel).join('·') || '분야 없음'} · 커밋 {(work.commits ?? []).length} · {work.reason ? '작업 이유 있음' : <span className="text-amber-700 dark:text-amber-400">작업 이유 없음</span>}
               </p>
               {editing === work.id ? (
                 <WorkEditor work={work} onDone={() => setEditing(null)} onChanged={onChanged} />
@@ -453,18 +455,18 @@ function WorkEditor({ work, onDone, onChanged }) {
         <input value={form.title} onChange={set('title')} maxLength={200} required className={fieldClass} />
       </label>
       <label className={label}>
-        왜 (이유)
+        작업 이유
         <textarea value={form.reason} onChange={set('reason')} maxLength={1000} rows={2} className={fieldClass} />
       </label>
       <label className={label}>
-        무엇을 (한 줄에 하나, "- "로 시작)
+        바꾼 내용 (한 줄에 하나, "- "로 시작)
         <textarea value={form.changes} onChange={set('changes')} maxLength={2000} rows={3} className={fieldClass} />
       </label>
       <fieldset className="flex flex-wrap gap-2 text-gray-300">
         <legend className="mb-1 text-gray-400">분야</legend>
         {AREAS.map((name) => (
           <label key={name} className="flex items-center gap-1">
-            <input type="checkbox" checked={form.areas.includes(name)} onChange={() => toggleArea(name)} /> {name}
+            <input type="checkbox" checked={form.areas.includes(name)} onChange={() => toggleArea(name)} /> {areaLabel(name)}
           </label>
         ))}
       </fieldset>

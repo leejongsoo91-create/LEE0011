@@ -4,7 +4,8 @@
 
 // 작업 번호: '보고서11' · '보고서11-2' (보고서 11의 2단계) · '수정-20261120-1' (보고서 없는 작은 수정, 날짜-순번)
 export const WORK_KEY = /^(보고서\d{1,3}(-\d{1,2})?|수정-\d{8}-\d{1,3})$/
-export const AREAS = ['화면', '에이전트', 'DB', '보안', '개발도구', '문서', '설정']
+// '데이터'는 보고서 13(SQL 20261122000000)에서 추가: 주식 사이트의 데이터 수집 코드
+export const AREAS = ['화면', '에이전트', 'DB', '보안', '개발도구', '문서', '설정', '데이터']
 export const WORK_STATUSES = ['진행 중', '완료', '되돌림']
 export const LIMITS = { title: 200, reason: 1000, changes: 2000, files: 300, commits: 50, path: 200, url: 300 }
 

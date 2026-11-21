@@ -10,8 +10,11 @@ test('팀 상태: 에이전트별 최신 기록, 기록 없으면 none', () => {
     { agent: 'lead', status: 'pass', created_at: at(20) },
     { agent: 'lead', status: 'running', created_at: at(5) },
     { agent: 'qa', status: 'pass', created_at: at(3) },
+    { agent: 'review', status: 'pass', created_at: at(4) },
   ]
-  const [lead, qa, devops] = teamStatus(rows, NOW)
+  const [lead, review, qa, devops] = teamStatus(rows, NOW)
+  assert.deepEqual(teamStatus([], NOW).map((member) => member.name), ['개발', '검토', '테스트', '운영'])
+  assert.equal(review.state, 'pass')
   assert.equal(lead.state, 'running')
   assert.equal(lead.last.created_at, at(5))
   assert.equal(qa.state, 'pass')
@@ -20,7 +23,7 @@ test('팀 상태: 에이전트별 최신 기록, 기록 없으면 none', () => {
 })
 
 test('팀 상태: 30분 넘으면 대기, 단 마지막이 실패면 실패 유지', () => {
-  const [lead, qa] = teamStatus(
+  const [lead, , qa] = teamStatus(
     [
       { agent: 'lead', status: 'running', created_at: at(31) },
       { agent: 'qa', status: 'fail', created_at: at(120) },
@@ -30,7 +33,7 @@ test('팀 상태: 30분 넘으면 대기, 단 마지막이 실패면 실패 유�
   assert.equal(lead.state, 'idle')
   assert.equal(qa.state, 'fail')
   // 실패 뒤 새 통과 기록이 오면 통과
-  const [, qa2] = teamStatus([{ agent: 'qa', status: 'fail', created_at: at(10) }, { agent: 'qa', status: 'pass', created_at: at(2) }], NOW)
+  const [, , qa2] = teamStatus([{ agent: 'qa', status: 'fail', created_at: at(10) }, { agent: 'qa', status: 'pass', created_at: at(2) }], NOW)
   assert.equal(qa2.state, 'pass')
 })
 

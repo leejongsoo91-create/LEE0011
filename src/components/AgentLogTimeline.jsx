@@ -5,9 +5,9 @@ import { KIND_LABEL, STATE_LABEL, STATE_STYLE, TEAM, filterLog, refLink } from '
 const SHORT = 5
 const LONG = 20
 const NAME = Object.fromEntries(TEAM.map((member) => [member.id, member.name]))
-const FILTERS = [{ id: 'all', name: '전체' }, ...TEAM.map((member) => ({ id: member.id, name: member.name.split('/')[0] }))]
+const FILTERS = [{ id: 'all', name: '전체' }, ...TEAM.map((member) => ({ id: member.id, name: member.name }))]
 
-// 개발 팀 작업 로그: 시각 · 에이전트 · 종류 · 요약 · 링크. 에이전트별로 걸러 볼 수 있고, 처음엔 5건만.
+// 개발 팀 작업 로그: 시각 · 에이전트 · 종류 · 요약 · 링크. 역할별로 걸러 볼 수 있고, 처음엔 5건만.
 export default function AgentLogTimeline({ rows, now }) {
   const [agent, setAgent] = useState('all')
   const [expanded, setExpanded] = useState(false)

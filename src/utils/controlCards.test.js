@@ -60,12 +60,12 @@ test('개발 팀 카드: 기록이 있을 때만, 작업 중 수·마지막 기�
   assert.equal(dev.to, '/control/dev')
   assert.equal(dev.main.value, 1)
   assert.equal(dev.sub, '마지막 기록 5분 전')
-  assert.equal(dev.items, 'Lead Coder ● · QA ✘ · DevOps —')
+  assert.equal(dev.items, '개발 ● · 검토 — · 테스트 ✘ · 운영 —')
   assert.equal(dev.attention, 1)
 })
 
 test('개발 팀 카드: 기록(info) 상태는 구분점과 겹치지 않는 ✎로', () => {
   const devLog = rows([{ agent: 'qa', status: 'info', created_at: '2026-11-06T02:55:00Z' }])
   const dev = buildControlCards({ ...sources(), devLog }, now).at(-1)
-  assert.equal(dev.items, 'Lead Coder — · QA ✎ · DevOps —')
+  assert.equal(dev.items, '개발 — · 검토 — · 테스트 ✎ · 운영 —')
 })

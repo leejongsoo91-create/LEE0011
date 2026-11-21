@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
 import DevWorkItem from '../components/DevWorkItem.jsx'
-// 데이터 관리 탭은 열 때 받는다 (작업 정리만 보는 때는 가볍게)
+// 기록 정리 탭은 열 때 받는다 (작업 모아보기만 보는 때는 가볍게)
 const DevDataTab = lazy(() => import('../components/DevDataTab.jsx'))
 import Skeleton from '../components/Skeleton.jsx'
 import useDevWindow from '../hooks/useDevWindow.js'
@@ -16,8 +16,8 @@ const chip = (active) =>
   }`
 
 // 중앙관제 개발 창 (/control/dev, 보고서 12 2단계): 개발 팀 카드를 누르면 관제 위에 뜬다. 폰은 화면 전체, 노트북은 큰 창.
-// "작업 정리": 고른 에이전트의 최신 작업 → 주간·월간·연간 목록(펼치면 왜·무엇을·코드·보고서·진행) · 검색은 기간과 상관없이 전체.
-// "데이터 관리"(?tab=data, 3단계): 원본 기록·작업 표, 묶기·고치기·합치기·숨기기·CSV (DevDataTab).
+// "작업 모아보기": 고른 역할의 최신 작업 → 주간·월간·연간 목록(펼치면 작업 이유·바꾼 내용·바뀐 파일·보고서·진행 단계) · 검색은 기간과 상관없이 전체.
+// "기록 정리"(?tab=data): 단계별 기록·작업 목록 표, 작업에 넣기·빼기·고치기·합치기·숨기기·엑셀 파일 (DevDataTab). 화면 글자는 보고서 13에서 한글로.
 // 고른 값은 주소에 남긴다 (?agent= &period= &at= &q=). 뒤로 가기·Esc·✕·바깥 누르기로 닫는다.
 // 화면 전체에 띄우려고 body에 바로 그린다 (main의 @container 안에서는 fixed가 main 기준이 됨).
 // 열려 있는 동안 뒤 화면(#root)은 inert로 막아 Tab이 창 밖으로 나가지 않고, 닫으면 연 자리로 포커스를 돌려준다.
@@ -114,8 +114,8 @@ export default function DevWindow() {
             </h2>
             <div role="tablist" aria-label="개발 창 탭" className="flex gap-1">
               {[
-                { id: 'work', name: '작업 정리' },
-                { id: 'data', name: '데이터 관리' },
+                { id: 'work', name: '작업 모아보기' },
+                { id: 'data', name: '기록 정리' },
               ].map((item) => (
                 <button
                   key={item.id}
@@ -139,7 +139,7 @@ export default function DevWindow() {
 
         {tab === 'work' && (
         <div className="flex flex-col gap-2 border-b border-gray-700 px-4 py-3">
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="에이전트 고르기">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="역할 고르기">
             {AGENT_FILTERS.map((item) => (
               <button key={item.id} type="button" aria-pressed={agent === item.id} onClick={() => update({ agent: item.id === 'all' ? '' : item.id })} className={chip(agent === item.id)}>
                 {item.name}

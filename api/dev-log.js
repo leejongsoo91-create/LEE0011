@@ -1,4 +1,4 @@
-// Vercel 함수: 개발 팀(Lead Coder · QA/Reviewer · DevOps/Monitor) 작업 기록 입구.
+// Vercel 함수: 개발 팀(개발 · 검토 · 테스트 · 운영) 작업 기록 입구.
 // 노트북의 scripts/dev-log.mjs가 단계마다 한 줄씩 보낸다. 받은 기록은 dev_log에 넣고, 업무 탭이 읽는다.
 //
 // 보안: 인터넷에 열린 주소라서 DEV_LOG_SECRET을 가진 호출만 받는다. (/api/plaud-hook과 같은 방식)
@@ -21,7 +21,8 @@ import { sendMessage } from './_agents/telegram.js'
 import { WORK_KEY, devWorkFields, mergeWork } from './_lib/devWork.js'
 
 export const MIN_SECRET_LENGTH = 32
-export const AGENTS = { lead: 'Lead Coder', qa: 'QA/Reviewer', devops: 'DevOps/Monitor' }
+// 역할 (보고서 13에서 검토 review 추가, SQL 20261122000000 필요)
+export const AGENTS = { lead: '개발', review: '검토', qa: '테스트', devops: '운영' }
 export const KINDS = ['plan', 'edit', 'test', 'review', 'commit', 'deploy', 'check']
 export const STATUSES = ['running', 'pass', 'fail', 'info']
 export const MAX_SUMMARY = 300
@@ -110,7 +111,8 @@ async function handleWork(req, res) {
 // QA 실패나 배포 실패면 텔레그램 알림 문구, 아니면 null
 export function alertText(row) {
   if (row.status !== 'fail') return null
-  if (row.agent === 'qa') return `⚠️ [개발 팀] QA 검토·테스트 실패\n${row.summary}`
+  if (row.agent === 'qa') return `⚠️ [개발 팀] 테스트 실패\n${row.summary}`
+  if (row.agent === 'review') return `⚠️ [개발 팀] 검토에서 막힘\n${row.summary}`
   if (row.kind === 'deploy') return `⚠️ [개발 팀] 배포 실패\n${row.summary}`
   return null
 }
@@ -133,7 +135,8 @@ export default async function handler(req, res) {
     try {
       await rest('dev_log', { method: 'POST', prefer: 'return=minimal', body: { ...parsed.row, user_id } })
     } catch (error) {
-      // SQL(20261120000000_dev_work.sql)을 실행하기 전에는 work_key 칸이 없어 400. 작업 번호만 빼고 다시 남긴다
+      // SQL(20261120000000_dev_work.sql)을 실행하기 전에는 work_key 칸이 없어 400. 작업 번호만 빼고 다시 남긴다.
+      // 다른 이유의 400(예: SQL 20261122 전의 review 역할 거부)은 다시 보내도 400이라 아래에서 500으로 끝난다
       if (error?.message !== 'supabase-400' || !parsed.row.work_key) throw error
       const { work_key: _dropped, ...row } = parsed.row
       await rest('dev_log', { method: 'POST', prefer: 'return=minimal', body: { ...row, user_id } })

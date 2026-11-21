@@ -10,10 +10,14 @@ export const PERIODS = [
 ]
 export const AGENT_FILTERS = [
   { id: 'all', name: '전체' },
-  { id: 'lead', name: 'Lead' },
-  { id: 'qa', name: 'QA' },
-  { id: 'devops', name: 'DevOps' },
+  { id: 'lead', name: '개발' },
+  { id: 'review', name: '검토' },
+  { id: 'qa', name: '테스트' },
+  { id: 'devops', name: '운영' },
 ]
+// 분야 표시 이름 (저장값은 그대로). '에이전트'는 서버 코드 전체를 뜻해서 '서버·에이전트'로 보여 준다
+export const AREA_LABEL = { 에이전트: '서버·에이전트' }
+export const areaLabel = (area) => AREA_LABEL[area] ?? area
 // 작업이 거치는 단계 순서 (진행 줄과 "지금 단계"에 쓴다)
 export const STEPS = ['plan', 'edit', 'test', 'review', 'commit', 'deploy', 'check']
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
@@ -84,7 +88,7 @@ export function groupWorks(works, kind, { withYear = false } = {}) {
   return [...groups.values()]
 }
 
-// 에이전트 거르기: Lead는 모든 작업, QA·DevOps는 그 에이전트 기록이 있는 작업만 (logs = 기간 안 한 줄 기록)
+// 역할 거르기: 개발은 모든 작업, 검토·테스트·운영은 그 역할의 기록이 있는 작업만 (logs = 작업들의 한 줄 기록)
 export function filterByAgent(works, logs, agent) {
   if (agent === 'all' || agent === 'lead') return works ?? []
   const keys = new Set((logs ?? []).filter((row) => row.agent === agent && row.work_key).map((row) => row.work_key))

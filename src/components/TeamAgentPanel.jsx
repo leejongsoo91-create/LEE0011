@@ -17,7 +17,7 @@ function BackToOverview({ className = '' }) {
   )
 }
 
-// 중앙관제 "개발 팀" 현황판: Lead Coder · QA/Reviewer · DevOps/Monitor 카드 3장(누르면 개발 창) + 작업 로그.
+// 중앙관제 "개발 팀" 현황판: 개발 · 검토 · 테스트 · 운영 카드 4장(누르면 개발 창) + 작업 로그.
 // 실시간 연결이 아니라, Claude Code가 단계마다 남긴 기록(dev_log)으로 상태를 계산한다.
 // 기록은 관제 화면이 useDevLog()로 한 번 읽어 넘긴다 (요약 카드와 같은 값을 쓰도록).
 export default function TeamAgentPanel({ log }) {
@@ -38,19 +38,19 @@ export default function TeamAgentPanel({ log }) {
         </div>
       </header>
       {isLoading ? (
-        <div role="status" aria-label="불러오는 중" className="grid grid-cols-1 gap-2 lg:grid-cols-3">
-          {[0, 1, 2].map((key) => (
+        <div role="status" aria-label="불러오는 중" className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((key) => (
             <Skeleton key={key} className="h-24 w-full" />
           ))}
         </div>
       ) : (
         <>
-          <ul className="grid grid-cols-1 gap-2 lg:grid-cols-3">
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {members.map((member) => {
               const style = STATE_STYLE[member.state]
               return (
                 <li key={member.id}>
-                  {/* 누르면 개발 창이 이 에이전트로 골라진 채 뜬다 (보고서 12) */}
+                  {/* 누르면 개발 창이 이 역할로 골라진 채 뜬다 (보고서 12) */}
                   <Link
                     to={`/control/dev?agent=${member.id}`}
                     className="flex h-full flex-col gap-1 rounded-xl border border-gray-700 bg-gray-800 p-4 transition-colors hover:border-gray-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-300"
@@ -65,7 +65,7 @@ export default function TeamAgentPanel({ log }) {
                     </span>
                   </p>
                   <p className="text-xs text-gray-400">{member.role}</p>
-                  <p className="min-h-5 break-words text-sm text-gray-200">
+                  <p className="line-clamp-3 min-h-5 break-words text-sm text-gray-200">
                     {member.last ? `${KIND_LABEL[member.last.kind] ?? ''} · ${member.last.summary}` : '아직 기록이 없어요'}
                   </p>
                   {member.last && <p className="text-xs text-gray-400 tabular-nums">{agoLabel(member.last.created_at, now)}</p>}

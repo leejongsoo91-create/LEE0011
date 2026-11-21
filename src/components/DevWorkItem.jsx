@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ChevronDown, ExternalLink } from 'lucide-react'
 import { getRow } from '../lib/db.js'
 import { formatAt } from '../utils/controlTime.js'
-import { changeLines, commitUrl, currentStep, fileTotals, fileUrl, stepLine, workDay } from '../utils/devWork.js'
+import { areaLabel, changeLines, commitUrl, currentStep, fileTotals, fileUrl, stepLine, workDay } from '../utils/devWork.js'
 import { KIND_LABEL, STATE_STYLE } from '../utils/teamStatus.js'
 
 const STATUS_STYLE = { 완료: STATE_STYLE.pass, 되돌림: STATE_STYLE.idle, '진행 중': STATE_STYLE.running }
@@ -17,7 +17,7 @@ function Section({ title, children }) {
   )
 }
 
-// 개발 창의 작업 한 줄 (보고서 12 2단계). 누르면 펼쳐서 왜 · 무엇을 · 코드(파일·줄 수·GitHub) · 보고서 · 진행을 보여 준다.
+// 개발 창의 작업 한 줄 (보고서 12 2단계). 누르면 펼쳐서 작업 이유 · 바꾼 내용 · 바뀐 파일(줄 수·GitHub) · 보고서 · 진행 단계를 보여 준다.
 // 파일 목록은 크기 때문에 펼칠 때 따로 불러온다. logs = 이 작업의 한 줄 기록.
 export default function DevWorkItem({ work, logs, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -61,7 +61,7 @@ export default function DevWorkItem({ work, logs, defaultOpen = false }) {
             <span className="rounded bg-gray-700 px-1.5 py-0.5 text-gray-200">{work.work_key}</span>
             {(work.areas ?? []).map((area) => (
               <span key={area} className="rounded border border-gray-700 px-1.5 py-0.5 text-gray-400">
-                {area}
+                {areaLabel(area)}
               </span>
             ))}
           </span>
@@ -73,10 +73,10 @@ export default function DevWorkItem({ work, logs, defaultOpen = false }) {
       </button>
       {open && (
         <div id={bodyId} className="flex flex-col gap-3 px-3 pt-1 pb-4 text-sm sm:pl-17">
-          <Section title="왜">
+          <Section title="작업 이유">
             <p className={work.reason ? 'whitespace-pre-line text-gray-200' : 'text-gray-500'}>{work.reason || '(기록 없음)'}</p>
           </Section>
-          <Section title="무엇을">
+          <Section title="바꾼 내용">
             {changes.length ? (
               <ul className="flex list-disc flex-col gap-0.5 pl-5 text-gray-200">
                 {changes.map((line, index) => (
@@ -87,7 +87,13 @@ export default function DevWorkItem({ work, logs, defaultOpen = false }) {
               <p className="text-gray-500">(기록 없음)</p>
             )}
           </Section>
-          <Section title={detail.status === 'ready' ? `코드 · 파일 ${detail.files.length}개 +${totals.added} −${totals.removed}` : '코드'}>
+          <Section
+            title={
+              detail.status === 'ready'
+                ? `바뀐 파일 ${detail.files.length}개 · 늘어난 줄 ${totals.added} · 줄어든 줄 ${totals.removed}`
+                : '바뀐 파일'
+            }
+          >
             {detail.status === 'loading' && <p className="text-gray-500">불러오는 중…</p>}
             {detail.status === 'error' && <p className="text-gray-500">파일 목록을 불러오지 못했어요</p>}
             {detail.status === 'ready' && (
@@ -103,7 +109,7 @@ export default function DevWorkItem({ work, logs, defaultOpen = false }) {
                       ) : (
                         <span className="min-w-0 flex-1 truncate text-gray-300">{file.path}</span>
                       )}
-                      <span className="shrink-0 text-gray-400 tabular-nums">
+                      <span className="shrink-0 text-gray-400 tabular-nums" title={`늘어난 줄 ${file.added} · 줄어든 줄 ${file.removed}`}>
                         +{file.added} −{file.removed}
                       </span>
                     </li>
@@ -116,7 +122,7 @@ export default function DevWorkItem({ work, logs, defaultOpen = false }) {
                 {work.commits.map((hash) =>
                   commitUrl(hash) ? (
                     <a key={hash} href={commitUrl(hash)} target="_blank" rel="noreferrer" className={linkClass}>
-                      커밋 {hash} <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                      GitHub에서 코드 보기 ({hash}) <ExternalLink className="h-3 w-3" aria-hidden="true" />
                     </a>
                   ) : (
                     <span key={hash} className="text-gray-400">
@@ -135,7 +141,7 @@ export default function DevWorkItem({ work, logs, defaultOpen = false }) {
             </Section>
           )}
           {steps.length > 0 && (
-            <Section title="진행">
+            <Section title="진행 단계">
               <ol className="flex flex-col gap-1 text-xs">
                 {steps.map((row) => {
                   const rowStyle = STATE_STYLE[row.status] ?? STATE_STYLE.info

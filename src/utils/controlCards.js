@@ -71,7 +71,7 @@ export function buildControlCards({ summary, work, schedule, investments, devLog
   ]
 }
 
-// 개발 팀(Lead Coder · QA · DevOps) 카드: 작업 중인 수, 마지막 기록, 각자 상태 기호. 실패는 확인 필요로 센다.
+// 개발 팀(개발 · 검토 · 테스트 · 운영) 카드: 작업 중인 수, 마지막 기록, 각자 상태 기호. 실패는 확인 필요로 센다.
 function devTeamCard(devLog, now) {
   const members = teamStatus(devLog.rows, now.getTime())
   const last = lastLogAt(devLog.rows)
@@ -82,7 +82,7 @@ function devTeamCard(devLog, now) {
     isLoading: devLog.isLoading,
     main: { value: members.filter((member) => member.state === 'running').length, label: '작업 중' },
     sub: last ? `마지막 기록 ${agoLabel(last, now.getTime())}` : '기록 없음',
-    items: members.map((member) => `${member.name.split('/')[0]} ${STATE_STYLE[member.state].icon}`).join(' · '),
+    items: members.map((member) => `${member.name} ${STATE_STYLE[member.state].icon}`).join(' · '),
     attention: members.filter((member) => member.state === 'fail').length,
   }
 }

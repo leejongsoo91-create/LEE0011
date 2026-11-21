@@ -3,7 +3,7 @@
 //
 // 쓰는 법:
 //   node scripts/dev-log.mjs <agent> <kind> <status> "<한 줄 요약>" [ref] [--work 보고서12-1]
-//     agent : lead | qa | devops
+//     agent : lead(개발) | review(검토) | qa(테스트) | devops(운영)
 //     kind  : plan | edit | test | review | commit | deploy | check
 //     status: running | pass | fail | info
 //     ref   : 커밋 해시 또는 https 주소 (선택)
@@ -80,7 +80,7 @@ async function main() {
   const { rest, work } = splitWorkArg(process.argv.slice(2))
   const [agent, kind, status, summary, ref] = rest
   if (!agent || !kind || !status || !summary) {
-    console.error('쓰는 법: node scripts/dev-log.mjs <lead|qa|devops> <kind> <running|pass|fail|info> "<요약>" [ref] [--work 보고서12-1]')
+    console.error('쓰는 법: node scripts/dev-log.mjs <lead|review|qa|devops> <kind> <running|pass|fail|info> "<요약>" [ref] [--work 보고서12-1]')
     process.exit(2)
   }
   try {

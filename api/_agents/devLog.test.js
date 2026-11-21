@@ -97,7 +97,7 @@ test('알림: QA 실패와 배포 실패만 텔레그램으로, 다른 실패는
 
   assert.equal(fake.sent.length, 2)
   assert.equal(fake.sent[0].chat_id, OWNER)
-  assert.match(fake.sent[0].text, /QA 검토·테스트 실패\n테스트 2개 실패/)
+  assert.match(fake.sent[0].text, /테스트 실패\n테스트 2개 실패/)
   assert.match(fake.sent[1].text, /배포 실패/)
   assert.equal(fake.tables.dev_log.length, 3)
 })
@@ -112,4 +112,11 @@ test('텔레그램이 실패해도 기록은 남고 200, DB 실패면 500', asyn
   const failed = await send()
   assert.equal(failed.status, 500)
   assert.deepEqual(failed.body, { error: 'store-failed' })
+})
+
+test('역할 4개: 검토(review)도 받고, 모르는 역할은 400 (보고서 13)', async () => {
+  assert.equal((await send({ ...BODY, agent: 'review' })).status, 200)
+  assert.equal(fake.tables.dev_log.at(-1).agent, 'review')
+  assert.equal((await send({ ...BODY, agent: 'boss' })).status, 400)
+  assert.match(alertText({ agent: 'review', kind: 'review', status: 'fail', summary: '지적 3건' }), /검토에서 막힘/)
 })
